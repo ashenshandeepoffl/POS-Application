@@ -1,0 +1,4 @@
+fastapi==0.110.0          # FastAPI for building the backend API
+uvicorn==0.27.1           # ASGI server to run FastAPI
+mysql-connector-python==8.3.0  # MySQL database connection
+python-dotenv==1.0.1      # Load environment variables from .env

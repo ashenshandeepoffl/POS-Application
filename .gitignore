@@ -1,0 +1,57 @@
+# Ignore Python virtual environment
+backend/venv/
+backend/__pycache__/
+
+# Ignore environment variables (Sensitive Data)
+backend/.env
+
+# Ignore database-related files (if you store dumps)
+database/*.sql
+database/*.db
+database/.db_schema
+
+# Ignore Node.js dependencies
+frontend/node_modules/
+frontend/.npm/
+frontend/.cache/
+
+# Ignore compiled Electron files (dist or build folders)
+frontend/dist/
+frontend/build/
+frontend/out/
+
+# Ignore logs and temp files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.pid
+*.seed
+*.bak
+*.swp
+*.swo
+*.swn
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+*.~lock
+
+# Ignore Python bytecode files
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore VS Code and JetBrains IDE settings
+.vscode/
+.idea/
+*.iml
+
+# Ignore Electron packaging outputs
+frontend/*.asar
+frontend/.webpack/
+
+# Ignore coverage reports
+coverage/
+*.coverage
+.nyc_output/
