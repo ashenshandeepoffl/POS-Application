@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Menu Options - POS Management</title>
+    <link rel="stylesheet" href="assets/css/menuOptions.css" />
+    <link rel="stylesheet" href="assets/css/nav.css" />
+    <!-- Ionicons for icons -->
+    <script
+      type="module"
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"
+    ></script>
+    <script
+      nomodule
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"
+    ></script>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Navigation will be loaded here -->
+      <div id="nav-placeholder"></div>
+
+      <!-- Main Content -->
+      <div class="main">
+        <div id="content-container">
+          <h2>Menu Options</h2>
+          <div class="options">
+            <div class="option-card" onclick="navigateTo('addCategory.html')">
+              <ion-icon name="albums-outline"></ion-icon>
+              <h3>Add New Category</h3>
+            </div>
+            <div class="option-card" onclick="navigateTo('addItem.html')">
+              <ion-icon name="cube-outline"></ion-icon>
+              <h3>Add New Grocery Items</h3>
+            </div>
+            <div
+              class="option-card"
+              onclick="navigateTo('updateCategory.html')"
+            >
+              <ion-icon name="create-outline"></ion-icon>
+              <h3>Update Category</h3>
+            </div>
+            <div class="option-card" onclick="navigateTo('updateItem.html')">
+              <ion-icon name="create-outline"></ion-icon>
+              <h3>Update Items</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      function navigateTo(page) {
+        window.location.href = page;
+      }
+    </script>
+    <script src="assets/js/nav.js"></script>
+  </body>
+</html>

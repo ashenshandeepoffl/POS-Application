@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Manager Dashboard</title>
+    <!-- Dashboard Specific CSS -->
+    <link rel="stylesheet" href="assets/css/dashboard.css" />
+    <!-- Shared Navigation CSS (ensure this path is correct) -->
+    <link rel="stylesheet" href="assets/css/nav.css" />
+    <!-- Ionicons -->
+    <script
+      type="module"
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"
+    ></script>
+    <script
+      nomodule
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"
+    ></script>
+    <!-- Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <!-- Optional: Chart.js date adapter if using time scale (may need additional setup) -->
+    <!-- <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script> -->
+  </head>
+  <body>
+    <!-- Navigation Sidebar (Loaded by nav.js or manually included) -->
+    <div id="nav-placeholder">
+      <!-- Navigation content will be loaded here by nav.js -->
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="main">
+      <!-- Top Bar (Loaded by topbar.js or manually included) -->
+      <div class="topbar-placeholder">
+        <!-- Topbar content will be loaded here by topbar.js -->
+      </div>
+
+      <!-- Dashboard Content -->
+      <div id="content-container">
+        <h2>Manager Dashboard</h2>
+
+        <!-- Summary Cards -->
+        <div class="cardBox">
+          <!-- Counts -->
+          <div class="card">
+            <div>
+              <div class="numbers" id="categoriesCount">...</div>
+              <div class="cardName">Categories</div>
+            </div>
+            <div class="iconBx">
+              <ion-icon name="albums-outline"></ion-icon>
+            </div>
+          </div>
+          <div class="card">
+            <div>
+              <div class="numbers" id="itemsCount">...</div>
+              <div class="cardName">Items</div>
+            </div>
+            <div class="iconBx"><ion-icon name="cube-outline"></ion-icon></div>
+          </div>
+          <div class="card">
+            <div>
+              <div class="numbers" id="customersCount">...</div>
+              <div class="cardName">Customers</div>
+            </div>
+            <div class="iconBx">
+              <ion-icon name="person-outline"></ion-icon>
+            </div>
+          </div>
+          <div class="card">
+            <div>
+              <div class="numbers" id="staffCount">...</div>
+              <div class="cardName">Staff</div>
+            </div>
+            <div class="iconBx">
+              <ion-icon name="people-outline"></ion-icon>
+            </div>
+          </div>
+          <div class="card">
+            <div>
+              <div class="numbers" id="storesCount">...</div>
+              <div class="cardName">Stores</div>
+            </div>
+            <div class="iconBx">
+              <ion-icon name="storefront-outline"></ion-icon>
+            </div>
+          </div>
+          <!-- Sales Overview -->
+          <div class="card">
+            <div>
+              <div class="numbers" id="totalSales">...</div>
+              <div class="cardName">Today's Sales</div>
+            </div>
+            <div class="iconBx"><ion-icon name="cash-outline"></ion-icon></div>
+          </div>
+          <div class="card">
+            <div>
+              <div class="numbers" id="totalOrders">...</div>
+              <div class="cardName">Today's Orders</div>
+            </div>
+            <div class="iconBx">
+              <ion-icon name="receipt-outline"></ion-icon>
+            </div>
+          </div>
+          <!-- Inventory & PO Insights -->
+          <div class="card low-stock-card">
+            <!-- Added class for specific styling -->
+            <div>
+              <div class="numbers" id="lowStockCount">...</div>
+              <div class="cardName">Low Stock Items</div>
+            </div>
+            <div class="iconBx">
+              <ion-icon name="alert-circle-outline"></ion-icon>
+            </div>
+          </div>
+          <div class="card">
+            <div>
+              <div class="numbers" id="pendingPOCount">...</div>
+              <div class="cardName">Pending POs</div>
+            </div>
+            <div class="iconBx">
+              <ion-icon name="document-text-outline"></ion-icon>
+            </div>
+          </div>
+          <div class="card">
+            <div>
+              <div class="numbers" id="topItem">...</div>
+              <div class="cardName">Top Selling Item (Today)</div>
+            </div>
+            <div class="iconBx"><ion-icon name="star-outline"></ion-icon></div>
+          </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="charts-section">
+          <div class="chart-container">
+            <h3>Sales Trend (Last 7 Days)</h3>
+            <canvas id="salesTrendChart"></canvas>
+            <div class="chart-placeholder" id="salesTrendPlaceholder">
+              Loading Chart...
+            </div>
+          </div>
+          <div class="chart-container">
+            <h3>Sales by Category (Today)</h3>
+            <canvas id="categorySalesChart"></canvas>
+            <div class="chart-placeholder" id="categorySalesPlaceholder">
+              Loading Chart...
+            </div>
+          </div>
+          <div class="chart-container">
+            <h3>Payment Methods (Today)</h3>
+            <canvas id="paymentMethodChart"></canvas>
+            <div class="chart-placeholder" id="paymentMethodPlaceholder">
+              Loading Chart...
+            </div>
+          </div>
+        </div>
+
+        <!-- Details Section -->
+        <div class="details-section">
+          <!-- Recent Sales -->
+          <div class="detail-box recent-sales">
+            <h3>Recent Sales</h3>
+            <div class="table-wrapper">
+              <table class="details-table" id="recentSalesTable">
+                <thead>
+                  <tr>
+                    <th>Sale ID</th>
+                    <th>Time</th>
+                    <th>Total (Rs)</th>
+                    <th>Status</th>
+                    <th>Staff</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Data loaded by JS -->
+                  <tr>
+                    <td colspan="5" class="loading-text">Loading...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <!-- Low Stock Items -->
+          <div class="detail-box low-stock-items">
+            <h3>Low Stock Items</h3>
+            <div class="table-wrapper">
+              <table class="details-table" id="lowStockTable">
+                <thead>
+                  <tr>
+                    <th>Item Name</th>
+                    <th>Store</th>
+                    <th>Qty</th>
+                    <th>Min Level</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Data loaded by JS -->
+                  <tr>
+                    <td colspan="4" class="loading-text">Loading...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- End #content-container -->
+    </div>
+    <!-- End .main -->
+
+    <!-- Load Shared JavaScript Files (ensure paths are correct) -->
+    <script src="assets/js/nav.js"></script>
+    <script src="assets/js/topbar.js"></script>
+    <!-- Assumes you have this -->
+    <!-- Load Dashboard Specific JavaScript -->
+    <script src="assets/js/dashboard.js"></script>
+  </body>
+</html>

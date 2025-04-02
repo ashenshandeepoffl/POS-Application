@@ -1,0 +1,80 @@
+/* Top Bar Container */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #fff;
+  padding: 12px 25px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  margin: 20px;
+}
+
+/* Toggle Icon */
+.topbar .toggle {
+  cursor: pointer;
+}
+
+/* Search Container */
+.topbar .search {
+  position: relative;
+  flex: 1;
+  margin: 0 20px;
+}
+
+/* Search Input */
+.topbar .search input {
+  width: 100%;
+  padding: 10px 40px 10px 15px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 16px;
+}
+
+/* Search Icon */
+.topbar .search ion-icon {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #888;
+  cursor: pointer;
+}
+
+/* Suggestions Dropdown */
+.topbar .search .suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-top: none;
+  z-index: 1000;
+  display: none;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+/* Each Suggestion */
+.topbar .search .suggestions .suggestion {
+  padding: 10px;
+  cursor: pointer;
+}
+
+.topbar .search .suggestions .suggestion:hover {
+  background-color: #f0f0f0;
+}
+
+/* User Avatar */
+.topbar .user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.topbar .user-avatar img {
+  width: 100%;
+  height: auto;
+}

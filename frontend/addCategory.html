@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Add Category - Menu Management</title>
+    <link rel="stylesheet" href="assets/css/menuOptions.css" />
+    <link rel="stylesheet" href="assets/css/addCategory.css" />
+  </head>
+  <body>
+    <div class="container">
+      <!-- Navigation Sidebar -->
+      <div class="navigation">
+        <ul>
+          <li>
+            <a href="dashboard.html" data-target="dashboard">
+              <span class="icon"
+                ><ion-icon name="home-outline"></ion-icon
+              ></span>
+              <span class="title">Dashboard</span>
+            </a>
+          </li>
+          <li>
+            <a href="menu.html" data-target="menu">
+              <span class="icon"
+                ><ion-icon name="fast-food-outline"></ion-icon
+              ></span>
+              <span class="title">Menu</span>
+            </a>
+          </li>
+          <li>
+            <a href="staff.html" data-target="staff">
+              <span class="icon"
+                ><ion-icon name="people-outline"></ion-icon
+              ></span>
+              <span class="title">Staff</span>
+            </a>
+          </li>
+          <li>
+            <a href="storeManagement.html" data-target="storeManagement">
+              <span class="icon"
+                ><ion-icon name="storefront-outline"></ion-icon
+              ></span>
+              <span class="title">Store Management</span>
+            </a>
+          </li>
+          <li>
+            <a href="salesManagement.html" data-target="salesManagement">
+              <span class="icon"
+                ><ion-icon name="receipt-outline"></ion-icon
+              ></span>
+              <span class="title">Sales Management</span>
+            </a>
+          </li>
+
+          <li>
+            <a href="checkout.html" data-target="checkout">
+              <span class="icon"
+                ><ion-icon name="cart-outline"></ion-icon
+              ></span>
+              <span class="title">Checkout</span>
+            </a>
+          </li>
+          <li>
+            <a href="discountsTaxes.html" data-target="discountsTaxes">
+              <span class="icon"
+                ><ion-icon name="pricetag-outline"></ion-icon
+              ></span>
+              <span class="title">Discounts & Taxes</span>
+            </a>
+          </li>
+          <li>
+            <a href="salesReporting.html" data-target="salesReporting">
+              <span class="icon"
+                ><ion-icon name="stats-chart-outline"></ion-icon
+              ></span>
+              <span class="title">Sales Reporting</span>
+            </a>
+          </li>
+          <li>
+            <a href="refundsReceipts.html" data-target="refundsReceipts">
+              <span class="icon"
+                ><ion-icon name="return-up-back-outline"></ion-icon
+              ></span>
+              <span class="title">Refunds & Receipts</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Main Content -->
+      <div class="main"
+
+        <div id="content-container">
+          <h2>Add New Category</h2>
+          <form id="addCategoryForm">
+            <label for="catName">Category Name</label>
+            <input
+              type="text"
+              id="catName"
+              placeholder="Enter category name"
+              required
+            />
+
+            <label for="catDescription">Category Description</label>
+            <textarea
+              id="catDescription"
+              placeholder="Enter description"
+            ></textarea>
+
+            <button type="submit" class="btn">Add Category</button>
+            <button type="button" id="backBtn" class="btn">Back</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document
+        .getElementById("addCategoryForm")
+        .addEventListener("submit", async function (e) {
+          e.preventDefault();
+          const name = document.getElementById("catName").value.trim();
+          const description = document
+            .getElementById("catDescription")
+            .value.trim();
+          const payload = {
+            category_name: name,
+            description: description,
+            status: "active",
+          };
+          try {
+            const response = await fetch("http://127.0.0.1:8000/categories/", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            if (!response.ok) throw new Error("Failed to add category");
+            alert("Category added successfully!");
+            window.location.href = "menuOptions.html";
+          } catch (error) {
+            console.error(error);
+            alert("Error adding category.");
+          }
+        });
+
+      document.getElementById("backBtn").addEventListener("click", function () {
+        window.location.href = "menuOptions.html";
+      });
+      document.addEventListener("DOMContentLoaded", () => {
+        // Toggle submenu on click for items with the 'has-submenu' class.
+        document
+          .querySelectorAll(".navigation ul li.has-submenu > a")
+          .forEach((link) => {
+            link.addEventListener("click", (e) => {
+              e.preventDefault(); // Prevent default action if using href="#"
+              const parentLi = link.parentElement;
+              parentLi.classList.toggle("open");
+            });
+          });
+      });
+    </script>
+
+    <!-- Ionicons -->
+    <script
+      type="module"
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"
+    ></script>
+    <script
+      nomodule
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"
+    ></script>
+  </body>
+</html>

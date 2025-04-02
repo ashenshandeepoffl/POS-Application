@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Staff Management</title>
+    <link rel="stylesheet" href="assets/css/staff.css" />
+    <link rel="stylesheet" href="assets/css/nav.css" />
+    <!-- Assumes topbar styles are potentially included here or loaded by JS -->
+    <!-- Ionicons for icons -->
+    <script
+      type="module"
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"
+    ></script>
+    <script
+      nomodule
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"
+    ></script>
+  </head>
+  <body>
+    <!-- Use container class if nav.css requires it -->
+    <!-- <div class="container"> -->
+
+    <!-- Navigation placeholder -->
+    <div id="nav-placeholder"></div>
+
+    <!-- Main Content -->
+    <div class="main">
+      <!-- Top Bar placeholder -->
+      <div class="topbar-placeholder"></div>
+
+      <div id="content-container">
+        <div class="staff-header">
+          <h2>Staff Management</h2>
+          <div class="header-actions">
+            <button class="btn primary-btn" id="addStaffBtn">
+              <ion-icon name="person-add-outline"></ion-icon> Add Staff
+            </button>
+          </div>
+        </div>
+
+        <!-- Filters and Search -->
+        <div class="controls-container">
+          <div class="search-container">
+            <ion-icon name="search-outline"></ion-icon>
+            <input
+              type="text"
+              id="staffSearch"
+              placeholder="Search by name or email..."
+            />
+          </div>
+          <div class="filter-container">
+            <label for="statusFilter">Status:</label>
+            <select id="statusFilter">
+              <option value="active" selected>Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="">All</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table id="staffTable" class="staff-table">
+            <thead>
+              <tr>
+                <!-- Add data-column for sorting -->
+                <th data-column="staff_id">
+                  ID <span class="sort-icon"></span>
+                </th>
+                <th data-column="full_name">
+                  Full Name <span class="sort-icon"></span>
+                </th>
+                <th data-column="role">Role <span class="sort-icon"></span></th>
+                <th data-column="status">
+                  Status <span class="sort-icon"></span>
+                </th>
+                <th data-column="email">
+                  Email <span class="sort-icon"></span>
+                </th>
+                <th data-column="phone_number">
+                  Phone <span class="sort-icon"></span>
+                </th>
+                <!-- Add more columns as needed, or keep details for modal -->
+                <!-- <th data-column="date_of_birth">DOB</th> -->
+                <!-- <th data-column="salary">Salary</th> -->
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="staffTableBody">
+              <!-- Loading indicator -->
+              <tr>
+                <td colspan="7" class="loading-text">Loading staff...</td>
+              </tr>
+            </tbody>
+          </table>
+          <div
+            id="noStaffMessage"
+            class="no-items-message"
+            style="display: none"
+          >
+            No staff members found matching the criteria.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- </div> -->
+    <!-- End container if used -->
+
+    <!-- Add/Edit Staff Modal -->
+    <div id="staffFormModal" class="modal">
+      <div class="modal-content modern">
+        <div class="modal-header">
+          <h3 id="modalTitle">Add New Staff</h3>
+          <span class="close-modal" id="closeStaffModal">×</span>
+        </div>
+        <form id="staffForm" class="modal-form">
+          <input type="hidden" id="staffId" name="staffId" />
+          <!-- For updates -->
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="fullName">Full Name *</label>
+              <input type="text" id="fullName" name="full_name" required />
+            </div>
+            <div class="form-group">
+              <label for="email">Email *</label>
+              <input type="email" id="email" name="email" required />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="phone">Phone</label>
+              <input type="tel" id="phone" name="phone_number" />
+            </div>
+            <div class="form-group">
+              <label for="dob">Date of Birth</label>
+              <input type="date" id="dob" name="date_of_birth" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="role">Role *</label>
+              <select id="role" name="role" required>
+                <option value="Employee" selected>Employee</option>
+                <option value="Manager">Manager</option>
+                <option value="Admin">Admin</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="status">Status *</label>
+              <select id="status" name="status" required>
+                <option value="active" selected>Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Optional Password Fields (for Add or explicit Change) -->
+          <div id="passwordSection" class="form-row password-section">
+            <div class="form-group">
+              <label for="password">Password *</label>
+              <input
+                type="password"
+                id="password"
+                name="password"
+                placeholder="Required for new staff"
+              />
+            </div>
+            <div class="form-group">
+              <!-- Optional: Confirm Password -->
+              <!-- <label for="confirmPassword">Confirm Password</label>
+                        <input type="password" id="confirmPassword" name="confirmPassword"> -->
+            </div>
+          </div>
+          <small id="passwordHelp" class="form-text"
+            >Enter password only when adding new staff or changing the
+            password.</small
+          >
+
+          <fieldset class="form-fieldset">
+            <legend>Job Details</legend>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="salary">Salary (Rs)</label>
+                <input
+                  type="number"
+                  id="salary"
+                  name="salary"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                />
+              </div>
+              <div class="form-group">
+                <label for="isManager">Is Manager?</label>
+                <select id="isManager" name="is_manager">
+                  <option value="false" selected>No</option>
+                  <option value="true">Yes</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="shiftStart">Shift Start</label>
+                <input type="time" id="shiftStart" name="shift_start_time" />
+              </div>
+              <div class="form-group">
+                <label for="shiftEnd">Shift End</label>
+                <input type="time" id="shiftEnd" name="shift_end_time" />
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset class="form-fieldset">
+            <legend>Address</legend>
+            <div class="form-group">
+              <label for="street">Street</label>
+              <input type="text" id="street" name="street" />
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="city">City</label>
+                <input type="text" id="city" name="city" />
+              </div>
+              <div class="form-group">
+                <label for="state">State</label>
+                <input type="text" id="state" name="state" />
+              </div>
+              <div class="form-group">
+                <label for="zipCode">Zip Code</label>
+                <input type="text" id="zipCode" name="zip_code" />
+              </div>
+            </div>
+          </fieldset>
+
+          <div class="form-group">
+            <label for="additionalDetails">Additional Details</label>
+            <textarea
+              id="additionalDetails"
+              name="additional_details"
+              rows="3"
+            ></textarea>
+          </div>
+
+          <div class="modal-actions form-actions">
+            <div
+              id="formError"
+              class="form-error"
+              style="display: none; text-align: left; margin-bottom: 10px"
+            ></div>
+            <button type="button" class="btn cancel-btn" id="cancelStaffForm">
+              Cancel
+            </button>
+            <button type="submit" class="btn primary-btn" id="saveStaffBtn">
+              Save Staff
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteConfirmModal" class="modal">
+      <div class="modal-content modern confirmation">
+        <div class="modal-header">
+          <h3>Confirm Action</h3>
+          <span class="close-modal" id="closeDeleteModal">×</span>
+        </div>
+        <div class="modal-body">
+          <p id="deleteConfirmMessage">Are you sure?</p>
+          <div class="modal-actions">
+            <button id="cancelDeleteBtn" class="btn secondary-btn">
+              Cancel
+            </button>
+            <button id="confirmDeleteBtn" class="btn danger-btn">
+              Confirm Delete
+            </button>
+          </div>
+          <div
+            id="deleteError"
+            class="form-error"
+            style="display: none; margin-top: 15px"
+          ></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification Placeholder -->
+    <div id="toastNotification" class="toast"></div>
+
+    <script src="assets/js/staff.js"></script>
+    <script src="assets/js/nav.js"></script>
+    <!-- <script src="assets/js/topbar.js"></script> -->
+    <!-- If you separate topbar JS -->
+  </body>
+</html>

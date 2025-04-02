@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Update Item - Menu Management</title>
+    <link rel="stylesheet" href="assets/css/updateItem.css" />
+  </head>
+  <body>
+    <div class="container">
+      <!-- Navigation Sidebar -->
+      <div class="navigation">
+        <ul>
+          <li>
+            <a href="dashboard.html" data-target="dashboard">
+              <span class="icon"
+                ><ion-icon name="home-outline"></ion-icon
+              ></span>
+              <span class="title">Dashboard</span>
+            </a>
+          </li>
+          <li>
+            <a href="menu.html" data-target="menu">
+              <span class="icon"
+                ><ion-icon name="fast-food-outline"></ion-icon
+              ></span>
+              <span class="title">Menu</span>
+            </a>
+          </li>
+          <li>
+            <a href="staff.html" data-target="staff">
+              <span class="icon"
+                ><ion-icon name="people-outline"></ion-icon
+              ></span>
+              <span class="title">Staff</span>
+            </a>
+          </li>
+          <li>
+            <a href="inventory.html" data-target="inventory">
+              <span class="icon"
+                ><ion-icon name="cube-outline"></ion-icon
+              ></span>
+              <span class="title">Inventory</span>
+            </a>
+          </li>
+          <li>
+            <a href="storeManagement.html" data-target="storeManagement">
+              <span class="icon"
+                ><ion-icon name="storefront-outline"></ion-icon
+              ></span>
+              <span class="title">Store Management</span>
+            </a>
+          </li>
+          <li>
+            <a href="salesManagement.html" data-target="salesManagement">
+              <span class="icon"
+                ><ion-icon name="receipt-outline"></ion-icon
+              ></span>
+              <span class="title">Sales Management</span>
+            </a>
+          </li>
+          <li>
+            <a href="discountsTaxes.html" data-target="discountsTaxes">
+              <span class="icon"
+                ><ion-icon name="pricetag-outline"></ion-icon
+              ></span>
+              <span class="title">Discounts & Taxes</span>
+            </a>
+          </li>
+          <li>
+            <a href="salesReporting.html" data-target="salesReporting">
+              <span class="icon"
+                ><ion-icon name="stats-chart-outline"></ion-icon
+              ></span>
+              <span class="title">Sales Reporting</span>
+            </a>
+          </li>
+          <li>
+            <a href="refundsReceipts.html" data-target="refundsReceipts">
+              <span class="icon"
+                ><ion-icon name="return-up-back-outline"></ion-icon
+              ></span>
+              <span class="title">Refunds & Receipts</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Main Content -->
+      <div class="main">
+        <div class="topbar">
+          <div class="toggle"><ion-icon name="menu-outline"></ion-icon></div>
+          <div class="search">
+            <input type="text" placeholder="Search here" />
+            <ion-icon name="search-outline"></ion-icon>
+          </div>
+          <div class="user">
+            <img src="assets/imgs/customer01.jpg" alt="User Image" />
+          </div>
+        </div>
+
+        <div id="content-container">
+          <h2>Update Grocery Item</h2>
+          <form id="updateItemForm">
+            <label for="selectItem">Select Item</label>
+            <select id="selectItem" required>
+              <!-- Options populated dynamically from /items -->
+            </select>
+            <label for="updItemName">Item Name</label>
+            <input
+              type="text"
+              id="updItemName"
+              placeholder="Enter item name"
+              required
+            />
+
+            <label for="updItemCategory">Category</label>
+            <select id="updItemCategory" required>
+              <!-- Options populated dynamically from /categories -->
+            </select>
+
+            <label for="updItemPrice">Price</label>
+            <input
+              type="number"
+              step="0.01"
+              id="updItemPrice"
+              placeholder="Enter price"
+              required
+            />
+
+            <label for="updItemCost">Cost Price</label>
+            <input
+              type="number"
+              step="0.01"
+              id="updItemCost"
+              placeholder="Enter cost price"
+              required
+            />
+
+            <label for="updItemBarcode">Barcode</label>
+            <input
+              type="text"
+              id="updItemBarcode"
+              placeholder="Enter barcode"
+              required
+            />
+
+            <label for="updItemPerishable">Is Perishable?</label>
+            <input type="checkbox" id="updItemPerishable" />
+
+            <label for="updItemImage">Image URL</label>
+            <input
+              type="text"
+              id="updItemImage"
+              placeholder="Enter image URL"
+            />
+
+            <button type="submit" class="btn">Update Item</button>
+            <button type="button" id="backBtn" class="btn">Back</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      async function loadItemsForUpdate() {
+        try {
+          const response = await fetch("http://127.0.0.1:8000/items/");
+          if (!response.ok) throw new Error("Failed to fetch items");
+          const items = await response.json();
+          const select = document.getElementById("selectItem");
+          select.innerHTML = "";
+          items.forEach((item) => {
+            const option = document.createElement("option");
+            option.value = item.item_id;
+            option.textContent = item.item_name;
+            select.appendChild(option);
+          });
+          loadItemData(select.value);
+        } catch (error) {
+          console.error("Error loading items:", error);
+        }
+      }
+
+      async function loadItemData(itemId) {
+        try {
+          const response = await fetch(`http://127.0.0.1:8000/items/${itemId}`);
+          if (!response.ok) throw new Error("Failed to fetch item data");
+          const item = await response.json();
+          document.getElementById("updItemName").value = item.item_name;
+          document.getElementById("updItemPrice").value = item.price;
+          document.getElementById("updItemCost").value = item.cost_price;
+          document.getElementById("updItemBarcode").value = item.barcode;
+          document.getElementById("updItemPerishable").checked =
+            item.is_perishable;
+          document.getElementById("updItemImage").value = item.image_url || "";
+          loadCategoriesForItemUpdate(item.category_id);
+        } catch (error) {
+          console.error("Error loading item data:", error);
+        }
+      }
+
+      async function loadCategoriesForItemUpdate(selectedCategoryId) {
+        try {
+          const response = await fetch("http://127.0.0.1:8000/categories/");
+          if (!response.ok) throw new Error("Failed to fetch categories");
+          const categories = await response.json();
+          const select = document.getElementById("updItemCategory");
+          select.innerHTML = "";
+          categories.forEach((cat) => {
+            const option = document.createElement("option");
+            option.value = cat.category_id;
+            option.textContent = cat.category_name;
+            if (cat.category_id == selectedCategoryId) {
+              option.selected = true;
+            }
+            select.appendChild(option);
+          });
+        } catch (error) {
+          console.error("Error loading categories:", error);
+        }
+      }
+
+      document
+        .getElementById("selectItem")
+        .addEventListener("change", function () {
+          loadItemData(this.value);
+        });
+
+      document
+        .getElementById("updateItemForm")
+        .addEventListener("submit", async function (e) {
+          e.preventDefault();
+          const itemId = document.getElementById("selectItem").value;
+          const itemName = document.getElementById("updItemName").value.trim();
+          const itemCategory = document.getElementById("updItemCategory").value;
+          const itemPrice = parseFloat(
+            document.getElementById("updItemPrice").value
+          );
+          const itemCost = parseFloat(
+            document.getElementById("updItemCost").value
+          );
+          const itemBarcode = document
+            .getElementById("updItemBarcode")
+            .value.trim();
+          const itemPerishable =
+            document.getElementById("updItemPerishable").checked;
+          const itemImage = document
+            .getElementById("updItemImage")
+            .value.trim();
+
+          const payload = {
+            item_name: itemName,
+            category_id: parseInt(itemCategory),
+            price: itemPrice,
+            cost_price: itemCost,
+            barcode: itemBarcode,
+            is_perishable: itemPerishable,
+            image_url: itemImage,
+          };
+
+          try {
+            const response = await fetch(
+              `http://127.0.0.1:8000/items/${itemId}`,
+              {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              }
+            );
+            if (!response.ok) throw new Error("Failed to update item");
+            alert("Item updated successfully!");
+            window.location.href = "menuOptions.html";
+          } catch (error) {
+            console.error("Error updating item:", error);
+            alert("Error updating item.");
+          }
+        });
+
+      document.getElementById("backBtn").addEventListener("click", function () {
+        window.location.href = "menuOptions.html";
+      });
+
+      document.addEventListener("DOMContentLoaded", loadItemsForUpdate);
+
+      document.addEventListener("DOMContentLoaded", () => {
+        // Toggle submenu on click for items with the 'has-submenu' class.
+        document
+          .querySelectorAll(".navigation ul li.has-submenu > a")
+          .forEach((link) => {
+            link.addEventListener("click", (e) => {
+              e.preventDefault();
+              const parentLi = link.parentElement;
+              parentLi.classList.toggle("open");
+            });
+          });
+      });
+    </script>
+
+    <!-- Ionicons -->
+    <script
+      type="module"
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"
+    ></script>
+    <script
+      nomodule
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"
+    ></script>
+  </body>
+</html>

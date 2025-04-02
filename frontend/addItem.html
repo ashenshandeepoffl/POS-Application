@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Add Item - Menu Management</title>
+    <link rel="stylesheet" href="assets/css/menuOptions.css" />
+    <link rel="stylesheet" href="assets/css/addItem.css" />
+  </head>
+  <body>
+    <div class="container">
+      <!-- Navigation Sidebar -->
+      <div class="navigation">
+        <ul>
+          <li>
+            <a href="dashboard.html" data-target="dashboard">
+              <span class="icon"
+                ><ion-icon name="home-outline"></ion-icon
+              ></span>
+              <span class="title">Dashboard</span>
+            </a>
+          </li>
+          <li>
+            <a href="menu.html" data-target="menu">
+              <span class="icon"
+                ><ion-icon name="fast-food-outline"></ion-icon
+              ></span>
+              <span class="title">Menu</span>
+            </a>
+          </li>
+          <li>
+            <a href="staff.html" data-target="staff">
+              <span class="icon"
+                ><ion-icon name="people-outline"></ion-icon
+              ></span>
+              <span class="title">Staff</span>
+            </a>
+          </li>
+          <li>
+            <a href="inventory.html" data-target="inventory">
+              <span class="icon"
+                ><ion-icon name="cube-outline"></ion-icon
+              ></span>
+              <span class="title">Inventory</span>
+            </a>
+          </li>
+          <li>
+            <a href="storeManagement.html" data-target="storeManagement">
+              <span class="icon"
+                ><ion-icon name="storefront-outline"></ion-icon
+              ></span>
+              <span class="title">Store Management</span>
+            </a>
+          </li>
+          <li>
+            <a href="orderManagement.html" data-target="orderManagement">
+              <span class="icon"
+                ><ion-icon name="receipt-outline"></ion-icon
+              ></span>
+              <span class="title">Order Management</span>
+            </a>
+          </li>
+          <li>
+            <a href="discountsTaxes.html" data-target="discountsTaxes">
+              <span class="icon"
+                ><ion-icon name="pricetag-outline"></ion-icon
+              ></span>
+              <span class="title">Discounts & Taxes</span>
+            </a>
+          </li>
+          <li>
+            <a href="salesReporting.html" data-target="salesReporting">
+              <span class="icon"
+                ><ion-icon name="stats-chart-outline"></ion-icon
+              ></span>
+              <span class="title">Sales Reporting</span>
+            </a>
+          </li>
+          <li>
+            <a href="refundsReceipts.html" data-target="refundsReceipts">
+              <span class="icon"
+                ><ion-icon name="return-up-back-outline"></ion-icon
+              ></span>
+              <span class="title">Refunds & Receipts</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Main Content -->
+      <div class="main">
+        <div id="content-container">
+          <h2>Add New Grocery Item</h2>
+          <form id="addItemForm">
+            <label for="itemName">Item Name</label>
+            <input
+              type="text"
+              id="itemName"
+              placeholder="Enter item name"
+              required
+            />
+
+            <label for="itemCategory">Category</label>
+            <select id="itemCategory" required>
+              <!-- Options populated dynamically -->
+            </select>
+
+            <label for="itemPrice">Price</label>
+            <input
+              type="number"
+              step="0.01"
+              id="itemPrice"
+              placeholder="Enter price"
+              required
+            />
+
+            <label for="itemCost">Cost Price</label>
+            <input
+              type="number"
+              step="0.01"
+              id="itemCost"
+              placeholder="Enter cost price"
+              required
+            />
+
+            <label for="itemBarcode">Barcode</label>
+            <input
+              type="text"
+              id="itemBarcode"
+              placeholder="Enter barcode"
+              required
+            />
+
+            <label for="itemPerishable">Is Perishable?</label>
+            <input type="checkbox" id="itemPerishable" />
+
+            <label for="itemImage">Image URL</label>
+            <input type="text" id="itemImage" placeholder="Enter image URL" />
+
+            <button type="submit" class="btn">Add Item</button>
+            <button type="button" id="backBtn" class="btn">Back</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      async function loadCategoryOptions() {
+        try {
+          const response = await fetch("http://127.0.0.1:8000/categories/");
+          if (!response.ok) throw new Error("Failed to fetch categories");
+          const categories = await response.json();
+          const select = document.getElementById("itemCategory");
+          select.innerHTML = "";
+          categories.forEach((cat) => {
+            const option = document.createElement("option");
+            option.value = cat.category_id;
+            option.textContent = cat.category_name;
+            select.appendChild(option);
+          });
+        } catch (error) {
+          console.error("Error loading categories:", error);
+        }
+      }
+
+      document
+        .getElementById("addItemForm")
+        .addEventListener("submit", async function (e) {
+          e.preventDefault();
+          const itemName = document.getElementById("itemName").value.trim();
+          const itemCategory = document.getElementById("itemCategory").value;
+          const itemPrice = parseFloat(
+            document.getElementById("itemPrice").value
+          );
+          const itemCost = parseFloat(
+            document.getElementById("itemCost").value
+          );
+          const itemBarcode = document
+            .getElementById("itemBarcode")
+            .value.trim();
+          const itemPerishable =
+            document.getElementById("itemPerishable").checked;
+          const itemImage = document.getElementById("itemImage").value.trim();
+
+          const payload = {
+            item_name: itemName,
+            category_id: parseInt(itemCategory),
+            price: itemPrice,
+            cost_price: itemCost,
+            barcode: itemBarcode,
+            is_perishable: itemPerishable,
+            image_url: itemImage,
+          };
+
+          try {
+            const response = await fetch("http://127.0.0.1:8000/items/", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            if (!response.ok) throw new Error("Failed to add item");
+            alert("Item added successfully!");
+            window.location.href = "menuOptions.html";
+          } catch (error) {
+            console.error("Error adding item:", error);
+            alert("Error adding item.");
+          }
+        });
+
+      document.getElementById("backBtn").addEventListener("click", function () {
+        window.location.href = "menuOptions.html";
+      });
+
+      document.addEventListener("DOMContentLoaded", loadCategoryOptions);
+
+      document.addEventListener("DOMContentLoaded", () => {
+        // Toggle submenu on click for items with the 'has-submenu' class.
+        document
+          .querySelectorAll(".navigation ul li.has-submenu > a")
+          .forEach((link) => {
+            link.addEventListener("click", (e) => {
+              e.preventDefault();
+              const parentLi = link.parentElement;
+              parentLi.classList.toggle("open");
+            });
+          });
+      });
+    </script>
+
+    <!-- Ionicons -->
+    <script
+      type="module"
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"
+    ></script>
+    <script
+      nomodule
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"
+    ></script>
+  </body>
+</html>

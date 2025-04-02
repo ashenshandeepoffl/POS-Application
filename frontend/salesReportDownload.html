@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sales Report Download</title>
+    <link rel="stylesheet" href="assets/css/menu.css" />
+    <link rel="stylesheet" href="assets/css/topbar.css" />
+    <link rel="stylesheet" href="assets/css/nav.css" />
+    <!-- Ionicons for icons -->
+    <script
+      type="module"
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"
+    ></script>
+    <script
+      nomodule
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"
+    ></script>
+    <style>
+      /* Styles for the report download page */
+      .report-container {
+        max-width: 600px;
+        margin: 50px auto;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        background-color: #f9f9f9;
+      }
+      .report-container h2 {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      .report-container label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      .report-container select,
+      .report-container button {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 15px;
+        font-size: 1rem;
+      }
+      .report-container button {
+        background: #007bff;
+        color: #fff;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Navigation will be loaded here -->
+      <div id="nav-placeholder"></div>
+
+      <!-- Main Content -->
+      <div class="main">
+        <div id="content-container">
+          <div class="report-container">
+            <h2>Download Sales Report</h2>
+            <div>
+              <label for="reportPeriod">Select Report Period:</label>
+              <select id="reportPeriod">
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly" selected>Monthly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+            </div>
+            <button id="downloadReportBtn">Download Report PDF</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="assets/js/salesReportDownload.js"></script>
+    <script src="assets/js/nav.js"></script>
+  </body>
+</html>

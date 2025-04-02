@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()  # Loads variables from a .env file if you choose to use one
 
-DATABASE_URL = os.getenv("DATABASE_URL", "mysql+pymysql://root:As+s01galaxysa@localhost/pos_db")
+DATABASE_URL = os.getenv("DATABASE_URL", "mysql+pymysql://root:4989@localhost/pos_db2")
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

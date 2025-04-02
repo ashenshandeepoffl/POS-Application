@@ -1,18 +1,18 @@
 {
-  "name": "frontend",
+  "name": "pos-electron-frontend",
   "version": "1.0.0",
-  "description": "",
+  "description": "Electron frontend for the POS system",
   "main": "main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "electron ."
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
-    "@electron/remote": "^2.1.2",
-    "electron": "^34.1.1",
-    "electron-builder": "^25.1.8",
-    "frontend": "file:"
+    "axios": "^1.4.0"
+  },
+  "devDependencies": {
+    "electron": "^25.0.0"
   }
 }

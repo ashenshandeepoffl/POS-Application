@@ -1,0 +1,47 @@
+/* Navigation Sidebar Styling */
+.navigation {
+    position: fixed;
+    width: 280px;
+    height: 100%;
+    background: #2a2185; /* Navigation blue */
+    padding-top: 20px;
+    transition: 0.4s ease-in-out;
+  }
+  
+  .navigation ul {
+    list-style: none;
+    padding: 20px;
+  }
+  
+  .navigation ul li {
+    margin-bottom: 12px;
+    transition: 0.3s;
+  }
+  
+  .navigation ul li a {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    color: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    transition: 0.3s ease-in-out;
+    font-size: 16px;
+    font-weight: 500;
+  }
+  
+  /* Active tab: white background and blue text */
+  .navigation ul li a:hover,
+  .navigation ul li.active a {
+    background: #fff;
+    color: #2a2185;
+  }
+  
+  .navigation ul li a .icon {
+    font-size: 20px;
+    margin-right: 12px;
+    width: 25px;
+    text-align: center;
+    display: inline-block;
+  }
+  

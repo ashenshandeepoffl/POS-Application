@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reports - POS Management</title>
+    <link rel="stylesheet" href="assets/css/salesReporting.css" />
+    <link rel="stylesheet" href="assets/css/nav.css" />
+    <!-- Ionicons -->
+    <script
+      type="module"
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"
+    ></script>
+    <script
+      nomodule
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"
+    ></script>
+  </head>
+  <body>
+    <!-- Navigation -->
+    <div id="nav-placeholder"></div>
+
+    <!-- Main Content -->
+    <div class="main">
+      <!-- Top Bar -->
+      <div class="topbar-placeholder"></div>
+
+      <div id="content-container">
+        <div class="page-header">
+          <h2>Reports Center</h2>
+          <!-- Add refresh or other global actions if needed -->
+        </div>
+
+        <div class="report-options-container">
+          <!-- Report Type Selection -->
+          <div class="report-section">
+            <h3>1. Select Report Type</h3>
+            <div class="form-group">
+              <select id="reportTypeSelect">
+                <option value="">-- Choose a Report --</option>
+                <option value="sales_summary_period">
+                  Sales Summary (Periodic)
+                </option>
+                <option value="sales_summary_custom">
+                  Sales Summary (Custom Range)
+                </option>
+                <option value="stock_level">Stock Level Report</option>
+                <!-- Add more report types as backend endpoints are created -->
+                <!-- <option value="sales_by_category">Sales by Category</option> -->
+                <!-- <option value="sales_by_item">Sales by Item</option> -->
+                <!-- <option value="low_stock">Low Stock Report</option> -->
+                <!-- <option value="stock_history">Stock History</option> -->
+              </select>
+            </div>
+          </div>
+
+          <!-- Report Parameters (Dynamically Shown) -->
+          <div
+            id="reportParameters"
+            class="report-section parameters-section"
+            style="display: none"
+          >
+            <h3>2. Set Parameters</h3>
+            <div class="parameters-grid">
+              <!-- Common Parameters -->
+              <div
+                class="form-group parameter"
+                data-reports="sales_summary_custom,stock_level,sales_by_category,sales_by_item,low_stock,stock_history"
+              >
+                <label for="paramStore">Store:</label>
+                <select id="paramStore">
+                  <option value="">All Stores</option>
+                  <!-- Stores loaded here -->
+                </select>
+              </div>
+
+              <!-- Date Range Parameters -->
+              <div
+                class="form-group parameter date-range-group"
+                data-reports="sales_summary_custom,sales_by_category,sales_by_item,stock_history"
+              >
+                <label>Date Range:</label>
+                <div class="date-inputs">
+                  <input type="date" id="paramStartDate" />
+                  <span>to</span>
+                  <input type="date" id="paramEndDate" />
+                </div>
+              </div>
+
+              <!-- Period Parameter -->
+              <div
+                class="form-group parameter"
+                data-reports="sales_summary_period"
+              >
+                <label for="paramPeriod">Period:</label>
+                <select id="paramPeriod">
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly" selected>Monthly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </div>
+
+              <!-- Stock Specific Parameters -->
+              <div
+                class="form-group parameter"
+                data-reports="stock_level,low_stock"
+              >
+                <label for="paramStockStatus">Stock Status:</label>
+                <select id="paramStockStatus">
+                  <option value="all" selected>All Items</option>
+                  <option value="low">Low Stock Only</option>
+                  <option value="in_stock">In Stock Only</option>
+                  <option value="out_of_stock">Out of Stock Only</option>
+                </select>
+              </div>
+
+              <!-- Add more specific parameters here (e.g., Category select, Staff Select) -->
+              <!-- <div class="form-group parameter" data-reports="sales_by_category"> ... </div> -->
+            </div>
+          </div>
+
+          <!-- Download Action -->
+          <div
+            id="downloadAction"
+            class="report-section download-section"
+            style="display: none"
+          >
+            <h3>3. Download Report</h3>
+            <button id="downloadPdfBtn" class="btn primary-btn download-btn">
+              <ion-icon name="document-text-outline"></ion-icon> Download PDF
+            </button>
+            <!-- <button id="downloadCsvBtn" class="btn secondary-btn download-btn">
+                         <ion-icon name="grid-outline"></ion-icon> Download CSV
+                     </button> -->
+            <div
+              id="downloadError"
+              class="form-error"
+              style="display: none; text-align: center; margin-top: 15px"
+            ></div>
+          </div>
+        </div>
+        <!-- End report-options-container -->
+      </div>
+      <!-- End #content-container -->
+    </div>
+    <!-- End .main -->
+
+    <!-- Toast Notification Placeholder -->
+    <div id="toastNotification" class="toast"></div>
+
+    <script src="assets/js/salesReporting.js"></script>
+    <script src="assets/js/nav.js"></script>
+    <!-- <script src="assets/js/topbar.js"></script> -->
+  </body>
+</html>

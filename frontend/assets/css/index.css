@@ -1,0 +1,76 @@
+/* Global Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Body Styling */
+body {
+  background: linear-gradient(to right, #141e30, #243b55);
+  color: #fff;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+/* Container */
+.container {
+  text-align: center;
+  animation: fadeIn 1.2s ease-out forwards;
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+/* Heading */
+h1 {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+  color: #00d4ff;
+}
+
+/* Subheading */
+p {
+  font-size: 1.3rem;
+  margin-bottom: 2rem;
+  color: #d0d0d0;
+}
+
+/* Login Button */
+.btn {
+  background-color: #00b7ff;
+  border: none;
+  padding: 0.9rem 2rem;
+  font-size: 1.2rem;
+  color: #fff;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 183, 255, 0.4);
+}
+
+.btn:hover {
+  background-color: #008ecc;
+  transform: scale(1.05);
+}
+
+/* Animation */
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Footer */
+footer {
+  position: absolute;
+  bottom: 15px;
+  width: 100%;
+  text-align: center;
+  font-size: 0.9rem;
+  color: #ccc;
+}

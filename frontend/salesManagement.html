@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sales Management</title>
+    <link rel="stylesheet" href="assets/css/salesManagement.css" />
+    <link rel="stylesheet" href="assets/css/nav.css" />
+    <!-- Ionicons -->
+    <script
+      type="module"
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"
+    ></script>
+    <script
+      nomodule
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"
+    ></script>
+  </head>
+  <body>
+    <!-- Navigation -->
+    <div id="nav-placeholder"></div>
+
+    <!-- Main Content -->
+    <div class="main">
+      <!-- Top Bar -->
+      <div class="topbar-placeholder"></div>
+
+      <div id="content-container">
+        <div class="page-header">
+          <h2>Sales Management</h2>
+          <div class="header-actions">
+            <button class="btn primary-btn" id="goToPOSBtn">
+              <ion-icon name="add-circle-outline"></ion-icon> Go to POS / Add
+              Sale
+            </button>
+            <button
+              class="btn secondary-btn"
+              id="exportSalesBtn"
+              title="Export current view"
+            >
+              <ion-icon name="download-outline"></ion-icon> Export
+            </button>
+          </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="controls-container">
+          <div class="filter-group">
+            <label for="dateRangeFilter">Date Range:</label>
+            <input type="date" id="startDateFilter" />
+            <span>-</span>
+            <input type="date" id="endDateFilter" />
+          </div>
+          <div class="filter-group">
+            <label for="storeFilter">Store:</label>
+            <select id="storeFilter">
+              <option value="">All Stores</option>
+              <!-- Options loaded by JS -->
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="staffFilter">Staff:</label>
+            <select id="staffFilter">
+              <option value="">All Staff</option>
+              <!-- Options loaded by JS -->
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="paymentStatusFilter">Status:</label>
+            <select id="paymentStatusFilter">
+              <option value="">All Statuses</option>
+              <option value="paid">Paid</option>
+              <option value="pending">Pending</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <button
+            class="btn tertiary-btn"
+            id="applyFiltersBtn"
+            title="Apply Filters"
+          >
+            <ion-icon name="filter-outline"></ion-icon> Apply
+          </button>
+          <button
+            class="btn tertiary-btn"
+            id="resetFiltersBtn"
+            title="Reset Filters"
+          >
+            <ion-icon name="refresh-outline"></ion-icon> Reset
+          </button>
+        </div>
+
+        <!-- Sales Table -->
+        <div class="table-container">
+          <table id="salesTable" class="data-table">
+            <thead>
+              <tr>
+                <th data-column="sale_id">
+                  Sale ID <span class="sort-icon"></span>
+                </th>
+                <th data-column="receipt_number">
+                  Receipt# <span class="sort-icon"></span>
+                </th>
+                <th data-column="created_at">
+                  Date <span class="sort-icon"></span>
+                </th>
+                <th data-column="staff_name">
+                  Staff <span class="sort-icon"></span>
+                </th>
+                <th data-column="store_name">
+                  Store <span class="sort-icon"></span>
+                </th>
+                <!-- <th data-column="customer_name">Customer</th> -->
+                <th data-column="total_amount" class="text-right">
+                  Total (Rs) <span class="sort-icon"></span>
+                </th>
+                <th data-column="payment_status">
+                  Status <span class="sort-icon"></span>
+                </th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="salesTableBody">
+              <!-- Loading Indicator -->
+              <tr>
+                <td colspan="8" class="loading-text">Loading sales...</td>
+              </tr>
+            </tbody>
+          </table>
+          <div
+            id="noSalesMessage"
+            class="no-items-message"
+            style="display: none"
+          >
+            No sales records found matching the criteria.
+          </div>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div class="pagination-controls" id="paginationControls">
+          <button id="prevPageBtn" class="btn tertiary-btn" disabled>
+            < Prev
+          </button>
+          <span id="pageInfo">Page 1 of 1</span>
+          <button id="nextPageBtn" class="btn tertiary-btn" disabled>
+            Next >
+          </button>
+          <select id="limitSelect">
+            <option value="15" selected>15 / page</option>
+            <option value="25">25 / page</option>
+            <option value="50">50 / page</option>
+            <option value="100">100 / page</option>
+          </select>
+        </div>
+      </div>
+      <!-- End #content-container -->
+    </div>
+    <!-- End .main -->
+
+    <!-- Sale Details Modal -->
+    <div id="saleDetailsModal" class="modal">
+      <div class="modal-content modern large">
+        <!-- Add 'large' class -->
+        <div class="modal-header">
+          <h3 id="detailsModalTitle">Sale Details (ID: ...)</h3>
+          <span class="close-modal" id="closeDetailsModal">×</span>
+        </div>
+        <div id="saleDetailsBody" class="modal-body sale-details">
+          <!-- Details loaded by JS -->
+          <p class="loading-text">Loading details...</p>
+        </div>
+        <div class="modal-actions form-actions">
+          <button type="button" class="btn secondary-btn" id="printReceiptBtn">
+            <ion-icon name="print-outline"></ion-icon> Print Receipt
+          </button>
+          <!-- Add Cancel/Refund buttons here if implementing -->
+          <!-- <button type="button" class="btn danger-btn" id="cancelSaleBtn">Cancel Sale</button> -->
+          <button
+            type="button"
+            class="btn cancel-btn"
+            id="closeDetailsModalBottom"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification Placeholder -->
+    <div id="toastNotification" class="toast"></div>
+
+    <script src="assets/js/salesManagement.js"></script>
+    <script src="assets/js/nav.js"></script>
+    <!-- <script src="assets/js/topbar.js"></script> -->
+  </body>
+</html>

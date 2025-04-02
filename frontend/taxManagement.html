@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tax Management</title>
+    <link rel="stylesheet" href="assets/css/taxManagement.css" />
+    <link rel="stylesheet" href="assets/css/nav.css" />
+    <!-- Ionicons -->
+    <script
+      type="module"
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"
+    ></script>
+    <script
+      nomodule
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"
+    ></script>
+  </head>
+  <body>
+    <!-- Navigation -->
+    <div id="nav-placeholder"></div>
+
+    <!-- Main Content -->
+    <div class="main">
+      <!-- Top Bar -->
+      <div class="topbar-placeholder"></div>
+
+      <div id="content-container">
+        <div class="page-header">
+          <h2>Tax Management</h2>
+          <div class="header-actions">
+            <button class="btn primary-btn" id="addTaxBtn">
+              <ion-icon name="add-circle-outline"></ion-icon> Add New Tax
+            </button>
+          </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="controls-container">
+          <div class="filter-container">
+            <label for="statusFilter">Filter by Status:</label>
+            <select id="statusFilter">
+              <option value="active" selected>Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="">All</option>
+            </select>
+          </div>
+          <button
+            class="btn tertiary-btn"
+            id="resetFiltersBtn"
+            title="Reset Filters"
+          >
+            <ion-icon name="refresh-outline"></ion-icon> Reset
+          </button>
+        </div>
+
+        <!-- Taxes Table -->
+        <div class="table-container">
+          <table id="taxesTable" class="data-table">
+            <thead>
+              <tr>
+                <th data-column="tax_id">ID <span class="sort-icon"></span></th>
+                <th data-column="tax_name">
+                  Name <span class="sort-icon"></span>
+                </th>
+                <th data-column="tax_percentage" class="text-right">
+                  Percentage (%) <span class="sort-icon"></span>
+                </th>
+                <th data-column="status">
+                  Status <span class="sort-icon"></span>
+                </th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="taxesTableBody">
+              <!-- Loading Indicator -->
+              <tr>
+                <td colspan="5" class="loading-text">Loading taxes...</td>
+              </tr>
+            </tbody>
+          </table>
+          <div
+            id="noTaxesMessage"
+            class="no-items-message"
+            style="display: none"
+          >
+            No taxes found matching the criteria.
+          </div>
+        </div>
+      </div>
+      <!-- End #content-container -->
+    </div>
+    <!-- End .main -->
+
+    <!-- Add/Edit Tax Modal -->
+    <div id="taxFormModal" class="modal">
+      <div class="modal-content modern small">
+        <!-- 'small' class for potentially smaller modal -->
+        <div class="modal-header">
+          <h3 id="modalTitle">Add New Tax</h3>
+          <span class="close-modal" id="closeTaxModal">×</span>
+        </div>
+        <form id="taxForm" class="modal-form">
+          <input type="hidden" id="taxId" name="taxId" />
+
+          <div class="form-group full-width">
+            <label for="taxName">Tax Name *</label>
+            <input type="text" id="taxName" name="tax_name" required />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="taxPercentage">Percentage (%) *</label>
+              <input
+                type="number"
+                id="taxPercentage"
+                name="tax_percentage"
+                min="0"
+                max="100"
+                step="0.01"
+                required
+                placeholder="e.g., 8.5"
+              />
+            </div>
+            <div class="form-group">
+              <label for="status">Status *</label>
+              <select id="status" name="status" required>
+                <option value="active" selected>Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="modal-actions form-actions">
+            <div id="formError" class="form-error" style="display: none"></div>
+            <button type="button" class="btn cancel-btn" id="cancelTaxForm">
+              Cancel
+            </button>
+            <button type="submit" class="btn primary-btn" id="saveTaxBtn">
+              Save Tax
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteConfirmModal" class="modal">
+      <div class="modal-content modern confirmation">
+        <div class="modal-header">
+          <h3>Confirm Deletion</h3>
+          <span class="close-modal" id="closeDeleteModal">×</span>
+        </div>
+        <div class="modal-body">
+          <p id="deleteConfirmMessage">Are you sure?</p>
+          <div class="modal-actions">
+            <button id="cancelDeleteBtn" class="btn secondary-btn">
+              Cancel
+            </button>
+            <button id="confirmDeleteBtn" class="btn danger-btn">
+              Delete Tax
+            </button>
+          </div>
+          <div
+            id="deleteError"
+            class="form-error"
+            style="display: none; margin-top: 15px"
+          ></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification Placeholder -->
+    <div id="toastNotification" class="toast"></div>
+
+    <script src="assets/js/taxManagement.js"></script>
+    <script src="assets/js/nav.js"></script>
+    <!-- <script src="assets/js/topbar.js"></script> -->
+  </body>
+</html>

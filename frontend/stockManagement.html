@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stock Management</title>
+    <link rel="stylesheet" href="assets/css/stockManagement.css" />
+    <link rel="stylesheet" href="assets/css/nav.css" />
+    <!-- Ionicons -->
+    <script
+      type="module"
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"
+    ></script>
+    <script
+      nomodule
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"
+    ></script>
+  </head>
+  <body>
+    <!-- Navigation -->
+    <div id="nav-placeholder"></div>
+
+    <!-- Main Content -->
+    <div class="main">
+      <!-- Top Bar -->
+      <div class="topbar-placeholder"></div>
+
+      <div id="content-container">
+        <div class="page-header">
+          <h2>Stock Management</h2>
+          <div class="header-actions">
+            <button class="btn primary-btn" id="addStockBtn">
+              <ion-icon name="add-circle-outline"></ion-icon> Add Stock Record
+            </button>
+            <button class="btn secondary-btn" id="viewHistoryBtn">
+              <ion-icon name="timer-outline"></ion-icon> View Stock History
+            </button>
+          </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="controls-container">
+          <div class="filter-container">
+            <label for="storeFilter">Store:</label>
+            <select id="storeFilter">
+              <option value="">All Stores</option>
+              <!-- Options loaded by JS -->
+            </select>
+          </div>
+          <div class="filter-container">
+            <label for="itemFilter">Item:</label>
+            <input
+              type="text"
+              id="itemFilter"
+              list="itemListForFilter"
+              placeholder="Filter by Item Name"
+            />
+            <datalist id="itemListForFilter">
+              <!-- Options loaded by JS -->
+            </datalist>
+          </div>
+          <div class="filter-container checkbox-filter">
+            <input type="checkbox" id="lowStockFilter" />
+            <label for="lowStockFilter">Show Low Stock Only</label>
+          </div>
+          <button
+            class="btn tertiary-btn"
+            id="resetFiltersBtn"
+            title="Reset Filters"
+          >
+            <ion-icon name="refresh-outline"></ion-icon> Reset
+          </button>
+        </div>
+
+        <!-- Stock Table -->
+        <div class="table-container">
+          <table id="stockTable" class="data-table">
+            <thead>
+              <tr>
+                <th data-column="stock_id">
+                  ID <span class="sort-icon"></span>
+                </th>
+                <th data-column="store_name">
+                  Store <span class="sort-icon"></span>
+                </th>
+                <th data-column="item_name">
+                  Item <span class="sort-icon"></span>
+                </th>
+                <th data-column="quantity" class="text-right">
+                  Quantity <span class="sort-icon"></span>
+                </th>
+                <th data-column="min_stock_level" class="text-right">
+                  Min Level <span class="sort-icon"></span>
+                </th>
+                <th data-column="cost" class="text-right">
+                  Cost (Rs) <span class="sort-icon"></span>
+                </th>
+                <th data-column="expiry_date">
+                  Expiry <span class="sort-icon"></span>
+                </th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="stockTableBody">
+              <!-- Loading Indicator -->
+              <tr>
+                <td colspan="8" class="loading-text">Loading stock...</td>
+              </tr>
+            </tbody>
+          </table>
+          <div
+            id="noStockMessage"
+            class="no-items-message"
+            style="display: none"
+          >
+            No stock records found matching the criteria.
+          </div>
+        </div>
+      </div>
+      <!-- End #content-container -->
+    </div>
+    <!-- End .main -->
+
+    <!-- Add/Edit Stock Modal -->
+    <div id="stockFormModal" class="modal">
+      <div class="modal-content modern">
+        <div class="modal-header">
+          <h3 id="modalTitle">Add New Stock</h3>
+          <span class="close-modal" id="closeStockModal">×</span>
+        </div>
+        <form id="stockForm" class="modal-form">
+          <input type="hidden" id="stockId" name="stockId" />
+          <!-- For updates -->
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="storeIdSelect">Store *</label>
+              <select id="storeIdSelect" name="store_id" required>
+                <option value="">-- Select Store --</option>
+                <!-- Options loaded by JS -->
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="itemIdSelect">Item *</label>
+              <select id="itemIdSelect" name="item_id" required>
+                <option value="">-- Select Item --</option>
+                <!-- Options loaded by JS -->
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="quantity">Quantity *</label>
+              <input
+                type="number"
+                id="quantity"
+                name="quantity"
+                min="0"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label for="minStockLevel">Min Stock Level *</label>
+              <input
+                type="number"
+                id="minStockLevel"
+                name="min_stock_level"
+                min="0"
+                value="5"
+                required
+              />
+              <!-- Default to 5 -->
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="cost">Cost (Per Unit) *</label>
+              <input
+                type="number"
+                id="cost"
+                name="cost"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label for="location">Location (Optional)</label>
+              <input
+                type="text"
+                id="location"
+                name="location"
+                placeholder="e.g., Shelf A1"
+              />
+            </div>
+          </div>
+
+          <fieldset class="form-fieldset">
+            <legend>Optional Details</legend>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="measurementUnit">Measurement Unit</label>
+                <input
+                  type="text"
+                  id="measurementUnit"
+                  name="measurement_unit"
+                  placeholder="e.g., kg, pcs, liter"
+                />
+              </div>
+              <div class="form-group">
+                <label for="batchNumber">Batch Number</label>
+                <input type="text" id="batchNumber" name="batch_number" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="manufactureDate">Manufacture Date</label>
+                <input
+                  type="date"
+                  id="manufactureDate"
+                  name="manufacture_date"
+                />
+              </div>
+              <div class="form-group">
+                <label for="expiryDate">Expiry Date</label>
+                <input type="date" id="expiryDate" name="expiry_date" />
+              </div>
+            </div>
+          </fieldset>
+
+          <div class="modal-actions form-actions">
+            <div id="formError" class="form-error" style="display: none"></div>
+            <button type="button" class="btn cancel-btn" id="cancelStockForm">
+              Cancel
+            </button>
+            <button type="submit" class="btn primary-btn" id="saveStockBtn">
+              Save Stock
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteConfirmModal" class="modal">
+      <div class="modal-content modern confirmation">
+        <div class="modal-header">
+          <h3>Confirm Deletion</h3>
+          <span class="close-modal" id="closeDeleteModal">×</span>
+        </div>
+        <div class="modal-body">
+          <p id="deleteConfirmMessage">Are you sure?</p>
+          <div class="modal-actions">
+            <button id="cancelDeleteBtn" class="btn secondary-btn">
+              Cancel
+            </button>
+            <button id="confirmDeleteBtn" class="btn danger-btn">
+              Delete Stock Record
+            </button>
+          </div>
+          <div
+            id="deleteError"
+            class="form-error"
+            style="display: none; margin-top: 15px"
+          ></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification Placeholder -->
+    <div id="toastNotification" class="toast"></div>
+
+    <script src="assets/js/stockManagement.js"></script>
+    <script src="assets/js/nav.js"></script>
+    <!-- <script src="assets/js/topbar.js"></script> -->
+  </body>
+</html>

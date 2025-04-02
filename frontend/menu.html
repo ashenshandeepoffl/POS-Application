@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Menu Management</title>
+    <link rel="stylesheet" href="assets/css/menu.css" />
+    <!-- <link rel="stylesheet" href="assets/css/topbar.css" /> -->
+    <!-- Included in nav.css now -->
+    <link rel="stylesheet" href="assets/css/nav.css" />
+    <!-- Ionicons for icons -->
+    <script
+      type="module"
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"
+    ></script>
+    <script
+      nomodule
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"
+    ></script>
+  </head>
+  <body>
+    <!-- Navigation placeholder -->
+    <div id="nav-placeholder"></div>
+
+    <!-- Main Content -->
+    <div class="main">
+      <!-- Top Bar placeholder -->
+      <div class="topbar-placeholder"></div>
+
+      <div id="content-container">
+        <div class="menu-header">
+          <h2>Menu Management</h2>
+          <div class="header-actions">
+            <button id="addItemBtn" class="btn primary-btn">
+              <ion-icon name="add-circle-outline"></ion-icon> Add Item
+            </button>
+            <button id="addCategoryBtn" class="btn secondary-btn">
+              <ion-icon name="add-outline"></ion-icon> Add Category
+            </button>
+          </div>
+        </div>
+
+        <!-- Category Section -->
+        <div class="category-section">
+          <span class="filter-label">Filter by Category:</span>
+          <div id="category-buttons-container">
+            <!-- "All" button placeholder -->
+            <button class="category active" data-category-id="">
+              All <span>...</span>
+            </button>
+            <!-- Dynamic category buttons will be inserted here -->
+          </div>
+          <!-- Removed Manage Menu button - Add Category is now prominent -->
+        </div>
+
+        <!-- Items Table -->
+        <div class="menu-table-container">
+          <div class="table-wrapper">
+            <table id="itemsTable">
+              <thead>
+                <tr>
+                  <!-- Add data-column attribute for sorting -->
+                  <th data-column="item_id">
+                    ID <span class="sort-icon"></span>
+                  </th>
+                  <th data-column="item_name">
+                    Name <span class="sort-icon"></span>
+                  </th>
+                  <th data-column="barcode">
+                    Barcode <span class="sort-icon"></span>
+                  </th>
+                  <th data-column="price">
+                    Price <span class="sort-icon"></span>
+                  </th>
+                  <th data-column="cost_price">
+                    Cost Price <span class="sort-icon"></span>
+                  </th>
+                  <th data-column="is_perishable">
+                    Perishable <span class="sort-icon"></span>
+                  </th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="itemsTableBody">
+                <!-- Loading indicator -->
+                <tr>
+                  <td colspan="7" class="loading-text">Loading items...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div
+            id="noItemsMessage"
+            class="no-items-message"
+            style="display: none"
+          >
+            No items found for the selected category.
+          </div>
+        </div>
+
+        <!-- ADD / UPDATE ITEM MODAL -->
+        <div id="itemFormModal" class="modal item-form-modal">
+          <div class="modal-content modern">
+            <div class="modal-header">
+              <h3 id="itemFormTitle">Add New Item</h3>
+              <span class="close" id="closeItemFormModal">×</span>
+            </div>
+            <form id="itemForm" class="modal-form">
+              <input type="hidden" id="itemId" name="itemId" />
+              <!-- For updates -->
+
+              <div class="form-group">
+                <label for="itemName">Item Name *</label>
+                <input
+                  type="text"
+                  id="itemName"
+                  name="item_name"
+                  required
+                  placeholder="Enter item name"
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="itemCategory">Category</label>
+                <select id="itemCategory" name="category_id">
+                  <option value="">-- Select Category --</option>
+                  <!-- Options loaded by JS -->
+                </select>
+              </div>
+
+              <div class="form-group half-width">
+                <label for="itemPrice">Price (Rs) *</label>
+                <input
+                  type="number"
+                  id="itemPrice"
+                  name="price"
+                  required
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div class="form-group half-width">
+                <label for="itemCostPrice">Cost Price (Rs)</label>
+                <input
+                  type="number"
+                  id="itemCostPrice"
+                  name="cost_price"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="itemBarcode">Barcode</label>
+                <input
+                  type="text"
+                  id="itemBarcode"
+                  name="barcode"
+                  placeholder="Scan or enter barcode"
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="itemImageUrl">Image URL</label>
+                <input
+                  type="url"
+                  id="itemImageUrl"
+                  name="image_url"
+                  placeholder="https://example.com/image.jpg"
+                />
+              </div>
+
+              <div class="form-group checkbox-group">
+                <input
+                  type="checkbox"
+                  id="itemPerishable"
+                  name="is_perishable"
+                />
+                <label for="itemPerishable">Is Perishable?</label>
+              </div>
+
+              <div class="modal-actions form-actions">
+                <button
+                  type="button"
+                  class="btn cancel-btn"
+                  id="cancelItemForm"
+                >
+                  Cancel
+                </button>
+                <button type="submit" class="btn primary-btn" id="saveItemBtn">
+                  Save Item
+                </button>
+              </div>
+              <div
+                id="itemFormError"
+                class="form-error"
+                style="display: none"
+              ></div>
+            </form>
+          </div>
+        </div>
+
+        <!-- CATEGORY FORM (SLIDER) -->
+        <div id="categoryForm" class="category-form">
+          <!-- Removed style="display:none" -->
+          <div class="category-form-header">
+            <h3>Add New Category</h3>
+            <button
+              id="closeCategoryForm"
+              class="close-form-btn"
+              title="Close Form"
+            >
+              ×
+            </button>
+          </div>
+          <form id="addCategoryFormInternal">
+            <!-- Icon Upload Removed for simplicity -->
+            <!--
+                     <label class="upload-icon">
+                        <input type="file" accept="image/*" />
+                        <span>Select Icon here</span>
+                     </label>
+                     -->
+            <div class="form-group">
+              <label for="categoryName">Category Name *</label>
+              <input
+                type="text"
+                id="categoryName"
+                name="category_name"
+                required
+                placeholder="Enter category name"
+              />
+            </div>
+            <div class="form-group">
+              <label for="categoryDescription">Description</label>
+              <textarea
+                id="categoryDescription"
+                name="description"
+                placeholder="Optional category description"
+              ></textarea>
+            </div>
+            <div class="form-group">
+              <label for="categoryStatus">Status</label>
+              <select id="categoryStatus" name="status">
+                <option value="active" selected>Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+            <div class="category-form-actions">
+              <button
+                type="submit"
+                id="saveCategoryBtn"
+                class="btn primary-btn"
+              >
+                Save Category
+              </button>
+            </div>
+            <div
+              id="categoryFormError"
+              class="form-error"
+              style="display: none"
+            ></div>
+          </form>
+        </div>
+        <!-- Overlay for Slider -->
+        <div id="slider-overlay" class="slider-overlay"></div>
+      </div>
+      <!-- End #content-container -->
+    </div>
+    <!-- End .main -->
+
+    <!-- Delete Confirmation Modal (Can reuse actionModal structure if preferred) -->
+    <div id="deleteConfirmModal" class="modal">
+      <div class="modal-content modern confirmation">
+        <div class="modal-header">
+          <h3>Confirm Deletion</h3>
+          <span class="close" id="closeDeleteModal">×</span>
+        </div>
+        <div class="modal-body">
+          <p id="deleteConfirmMessage">
+            Are you sure you want to delete this item?
+          </p>
+          <div class="modal-actions">
+            <button id="cancelDeleteBtn" class="btn secondary-btn">
+              Cancel
+            </button>
+            <button id="confirmDeleteBtn" class="btn danger-btn">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- JavaScript Files -->
+    <script src="assets/js/menu.js"></script>
+    <!-- Ensure these load AFTER menu.js if menu.js relies on them, or handle load order -->
+    <script src="assets/js/nav.js"></script>
+    <script src="assets/js/topbar.js"></script>
+  </body>
+</html>

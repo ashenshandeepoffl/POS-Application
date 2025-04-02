@@ -1,0 +1,399 @@
+/* =========== Google Fonts ============ */
+@import url("https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap");
+
+/* =============== Globals ============== */
+* {
+  font-family: "Ubuntu", sans-serif;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --blue: #2a2185;
+  --lightblue: #4e47a8; /* A lighter blue for variety */
+  --white: #fff;
+  --gray: #f5f5f5;
+  --lightgray: #fafafa;
+  --border-color: #eee;
+  --shadow-color: rgba(0, 0, 0, 0.08);
+  --black1: #222;
+  --black2: #555; /* Darker gray for text */
+  --black3: #777; /* Lighter gray for secondary text */
+  --red: #d9534f; /* For alerts/low stock */
+  --green: #5cb85c; /* For success/paid */
+  --orange: #f0ad4e; /* For pending/warning */
+
+  --icon-size: 20px;
+  --card-shadow: 0 4px 10px var(--shadow-color);
+  --section-bg: var(--white);
+}
+
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
+  background: var(--gray);
+  color: var(--black2);
+}
+
+/* =============== Main Content Area (Adjust based on nav.css) ================ */
+.main {
+  /* Ensure this matches the width set in nav.css for the sidebar */
+  margin-left: 280px;
+  padding: 20px;
+  width: calc(100% - 280px);
+  transition: margin-left 0.4s ease-in-out, width 0.4s ease-in-out;
+  position: relative; /* Needed for potential absolute positioned elements inside */
+}
+
+/* When navigation is toggled (assuming nav.js adds 'active' class) */
+.main.active {
+    margin-left: 80px; /* Adjust to collapsed sidebar width */
+    width: calc(100% - 80px);
+}
+
+/* Placeholder for topbar if loaded dynamically */
+.topbar-placeholder {
+    min-height: 70px; /* Adjust height as needed */
+    margin-bottom: 20px; /* Space below topbar */
+}
+
+
+#content-container {
+  padding: 10px; /* Reduced overall padding */
+}
+
+#content-container h2 {
+    color: var(--blue);
+    margin-bottom: 25px;
+    font-weight: 700;
+    font-size: 1.8rem;
+}
+
+/* =============== Dashboard Cards =============== */
+.cardBox {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); /* Adjusted minmax */
+  gap: 25px; /* Increased gap */
+  margin-bottom: 30px;
+}
+
+.card {
+  background: var(--section-bg);
+  padding: 20px 25px; /* Adjusted padding */
+  border-radius: 12px; /* Slightly more rounded */
+  box-shadow: var(--card-shadow);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  cursor: pointer;
+  border-left: 4px solid var(--lightblue); /* Accent border */
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+}
+
+.card .numbers {
+  font-size: 1.8rem; /* Adjusted size */
+  font-weight: 600;
+  color: var(--blue);
+  line-height: 1.2;
+  white-space: nowrap; /* Prevent wrapping */
+  overflow: hidden;
+  text-overflow: ellipsis; /* Add ellipsis if number is too long */
+  max-width: 150px; /* Limit width if needed */
+}
+
+.card .cardName {
+  font-size: 0.9rem;
+  color: var(--black3); /* Lighter gray */
+  margin-top: 5px;
+  font-weight: 500;
+}
+
+.card .iconBx {
+  font-size: 2.5rem;
+  color: var(--lightblue);
+  opacity: 0.8;
+}
+
+/* Specific Card Styling */
+.card.low-stock-card {
+    border-left-color: var(--red);
+}
+.card.low-stock-card .numbers,
+.card.low-stock-card .iconBx {
+    color: var(--red);
+}
+
+.card:hover .iconBx {
+    opacity: 1;
+}
+
+/* =============== Charts Section =============== */
+.charts-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); /* Min width for charts */
+    gap: 20px; /* << REDUCED GAP */
+    margin-bottom: 30px;
+}
+
+.chart-container {
+    background: var(--section-bg);
+    padding: 20px; /* << REDUCED PADDING */
+    border-radius: 10px; /* Back to 10px */
+    box-shadow: var(--card-shadow);
+    position: relative; /* For placeholder positioning */
+    height: 280px; /* << SET FIXED HEIGHT */
+    display: flex; /* Use flexbox */
+    flex-direction: column; /* Stack title and canvas */
+}
+
+.chart-container h3 {
+    margin-bottom: 10px; /* << REDUCED MARGIN */
+    color: var(--black1);
+    font-size: 1rem; /* << SMALLER FONT */
+    font-weight: 600;
+    text-align: center;
+    flex-shrink: 0; /* Prevent title from shrinking */
+}
+
+/* Make canvas responsive and fill container */
+.chart-container canvas {
+    max-width: 100%;
+    flex-grow: 1; /* Allow canvas to grow */
+    height: auto !important; /* Maintain aspect ratio */
+}
+
+/* Placeholder for loading state */
+.chart-placeholder {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--black3);
+    font-size: 0.9rem;
+    background-color: rgba(255, 255, 255, 0.8); /* Semi-transparent overlay */
+    border-radius: 10px; /* Match container */
+    z-index: 1; /* Ensure it's above the canvas initially */
+    padding: 10px;
+    text-align: center;
+}
+/* Hide placeholder when canvas is ready (JS should handle this) */
+.chart-container canvas:not([data-placeholder]) + .chart-placeholder {
+    display: none;
+}
+
+
+/* =============== Details Section (Tables) =============== */
+.details-section {
+    display: grid;
+    /* Start with single column, adjust below */
+    grid-template-columns: 1fr;
+    gap: 25px;
+}
+
+/* Use media query for two columns on larger screens */
+@media (min-width: 992px) {
+    .details-section {
+        grid-template-columns: repeat(2, 1fr); /* Two equal columns */
+    }
+}
+
+
+.detail-box {
+    background: var(--section-bg);
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: var(--card-shadow);
+    overflow: hidden; /* Prevent content overflow */
+}
+
+.detail-box h3 {
+    margin-bottom: 15px;
+    color: var(--black1);
+    font-size: 1.05rem;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+}
+
+.table-wrapper {
+    overflow-x: auto; /* Allow horizontal scrolling on small screens */
+    max-height: 400px; /* Limit table height if needed */
+}
+
+.details-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 0.9rem;
+}
+
+.details-table thead th {
+    background-color: var(--lightgray);
+    color: var(--black2);
+    font-weight: 600;
+    text-align: left;
+    padding: 12px 15px; /* Increased padding */
+    border-bottom: 2px solid var(--border-color);
+    position: sticky; /* Make header sticky */
+    top: 0; /* Stick to top within scrollable container */
+    z-index: 1; /* Ensure header is above scrolling content */
+}
+
+.details-table tbody td {
+    padding: 12px 15px; /* Match header padding */
+    border-bottom: 1px solid var(--border-color);
+    color: var(--black2);
+    vertical-align: middle;
+    white-space: nowrap; /* Prevent text wrapping initially */
+}
+/* Allow wrapping for specific columns if needed */
+/* .details-table tbody td:nth-child(1) { white-space: normal; } */
+
+.details-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.details-table tbody tr:hover {
+    background-color: var(--lightgray);
+}
+
+.details-table .loading-text,
+.details-table .no-data-text {
+    text-align: center;
+    color: var(--black3);
+    font-style: italic;
+    padding: 20px;
+}
+
+/* Status Badge Styling */
+.status-badge {
+    padding: 4px 10px; /* Slightly larger */
+    border-radius: 15px; /* More rounded */
+    font-size: 0.75rem; /* Smaller text */
+    font-weight: 600; /* Bold */
+    text-transform: capitalize;
+    display: inline-block; /* Ensure proper spacing */
+    line-height: 1.2;
+    text-align: center;
+    min-width: 60px;
+}
+/* Use more distinct colors */
+.status-paid { background-color: #e0f2e9; color: #1d7a46; border: 1px solid #a3d9b8; }
+.status-pending { background-color: #fff8e1; color: #a1740b; border: 1px solid #ffe59e; }
+.status-cancelled { background-color: #fdecea; color: #a8323a; border: 1px solid #f7b9bc; }
+/* Add other statuses if needed */
+.status-unknown { background-color: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6; }
+
+/* Low stock quantity highlight */
+.low-stock-qty {
+    color: var(--red);
+    font-weight: bold;
+}
+
+
+/* =============== Responsive Adjustments =============== */
+
+/* Larger Screens (adjust breakpoint as needed) */
+@media (min-width: 1200px) {
+    .cardBox {
+        grid-template-columns: repeat(5, 1fr); /* Allow 5 cards per row */
+    }
+    .charts-section {
+        /* Keep 3 columns even on very wide screens */
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* Tablet Screens */
+@media (max-width: 991px) {
+  .main {
+    margin-left: 80px; /* Assuming collapsed nav width */
+    width: calc(100% - 80px);
+  }
+  .main.active { /* When nav is open on small screens */
+      margin-left: 280px;
+      width: calc(100% - 280px);
+  }
+  .cardBox {
+     grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+     gap: 15px;
+  }
+   .card .numbers { font-size: 1.6rem; }
+   .card .iconBx { font-size: 2.2rem; }
+
+   .charts-section {
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Adjust min width */
+        gap: 15px;
+    }
+    .chart-container {
+        height: 260px; /* Slightly smaller height on tablets */
+        padding: 15px;
+    }
+    .chart-container h3 { font-size: 0.9rem; }
+}
+
+/* Mobile Screens */
+@media (max-width: 768px) {
+  .main {
+    margin-left: 0; /* No margin when nav is hidden */
+    width: 100%;
+    padding: 15px;
+  }
+   .main.active { /* Nav open */
+      margin-left: 0; /* Keep full width, nav overlays */
+  }
+  #content-container h2 { font-size: 1.5rem; margin-bottom: 20px; }
+  .cardBox {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 15px;
+  }
+  .card { padding: 15px 20px; border-left-width: 3px; }
+  .card .numbers { font-size: 1.4rem; }
+  .card .cardName { font-size: 0.8rem; }
+  .card .iconBx { font-size: 2rem; }
+
+  .charts-section {
+    grid-template-columns: 1fr; /* Stack charts */
+    gap: 20px;
+  }
+  .chart-container {
+      height: 250px; /* Further reduced height */
+      padding: 15px;
+    }
+  .chart-container h3 { font-size: 0.95rem; margin-bottom: 8px;}
+
+  .details-section {
+    grid-template-columns: 1fr; /* Stack details */
+    gap: 20px;
+  }
+  .detail-box { padding: 20px; }
+  .detail-box h3 { font-size: 1rem; }
+
+  .details-table { font-size: 0.85rem; }
+  .details-table thead th, .details-table tbody td { padding: 10px 12px; }
+  .details-table tbody td { white-space: normal; } /* Allow wrapping */
+  .status-badge { padding: 3px 8px; font-size: 0.7rem; }
+}
+
+/* Smallest Screens */
+@media (max-width: 480px) {
+    .main { padding: 10px; }
+    #content-container h2 { font-size: 1.3rem; }
+    .cardBox {
+       grid-template-columns: 1fr; /* Single column cards */
+       gap: 12px;
+    }
+     .card { padding: 15px; }
+    .chart-container { height: 240px; } /* Even smaller */
+    .details-table thead th, .details-table tbody td { padding: 8px 10px; }
+}

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Login - MyBrand POS</title>
+    <link rel="stylesheet" href="assets/css/logReg.css" />
+  </head>
+  <body>
+    <div class="split-container">
+      <div class="illustration-area">
+        <div class="logo">POS System</div>
+        <img
+          src="assets/imgs/Images.png"
+          alt="Login Illustration"
+          class="illustration"
+        />
+      </div>
+
+      <div class="form-area">
+        <a href="index.html" class="back-button">← Back</a>
+        <h2>Account Login</h2>
+        <p>Please login with your email and password.</p>
+
+        <form id="loginForm">
+          <label for="loginEmail">Email Address</label>
+          <input
+            type="email"
+            id="loginEmail"
+            name="loginEmail"
+            placeholder="john@example.com"
+            required
+          />
+
+          <label for="loginPassword">Password</label>
+          <input
+            type="password"
+            id="loginPassword"
+            name="loginPassword"
+            placeholder="••••••••"
+            required
+          />
+
+          <button type="submit">Login</button>
+        </form>
+      </div>
+    </div>
+
+    <script src="js/script.js"></script>
+  </body>
+</html>

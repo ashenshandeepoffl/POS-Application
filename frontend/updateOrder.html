@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Update Sale - Sales Management</title>
+    <link rel="stylesheet" href="assets/css/menu.css" />
+    <link rel="stylesheet" href="assets/css/topbar.css" />
+    <style>
+      /* Basic styling for the update sale form */
+      form {
+        max-width: 500px;
+        margin: 20px auto;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        background: #f9f9f9;
+      }
+      form div {
+        margin-bottom: 10px;
+      }
+      form label {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 5px;
+      }
+      form input,
+      form select {
+        width: 100%;
+        padding: 8px;
+        box-sizing: border-box;
+      }
+      form button {
+        padding: 10px 20px;
+        background: #007bff;
+        color: #fff;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Navigation Sidebar -->
+      <div class="navigation">
+        <ul>
+          <li>
+            <a href="dashboard.html" data-target="dashboard">
+              <span class="icon"
+                ><ion-icon name="home-outline"></ion-icon
+              ></span>
+              <span class="title">Dashboard</span>
+            </a>
+          </li>
+          <li>
+            <a href="menu.html" data-target="menu">
+              <span class="icon"
+                ><ion-icon name="fast-food-outline"></ion-icon
+              ></span>
+              <span class="title">Menu</span>
+            </a>
+          </li>
+          <li>
+            <a href="staff.html" data-target="staff">
+              <span class="icon"
+                ><ion-icon name="people-outline"></ion-icon
+              ></span>
+              <span class="title">Staff</span>
+            </a>
+          </li>
+          <li>
+            <a href="inventory.html" data-target="inventory">
+              <span class="icon"
+                ><ion-icon name="cube-outline"></ion-icon
+              ></span>
+              <span class="title">Inventory</span>
+            </a>
+          </li>
+          <li>
+            <a href="storeManagement.html" data-target="storeManagement">
+              <span class="icon"
+                ><ion-icon name="storefront-outline"></ion-icon
+              ></span>
+              <span class="title">Store Management</span>
+            </a>
+          </li>
+          <li>
+            <!-- Updated link: Order Management -> Sales Management -->
+            <a href="salesManagement.html" data-target="salesManagement">
+              <span class="icon"
+                ><ion-icon name="receipt-outline"></ion-icon
+              ></span>
+              <span class="title">Sales Management</span>
+            </a>
+          </li>
+          <li>
+            <a href="discountsTaxes.html" data-target="discountsTaxes">
+              <span class="icon"
+                ><ion-icon name="pricetag-outline"></ion-icon
+              ></span>
+              <span class="title">Discounts & Taxes</span>
+            </a>
+          </li>
+          <li>
+            <a href="salesReporting.html" data-target="salesReporting">
+              <span class="icon"
+                ><ion-icon name="stats-chart-outline"></ion-icon
+              ></span>
+              <span class="title">Sales Reporting</span>
+            </a>
+          </li>
+          <li>
+            <a href="refundsReceipts.html" data-target="refundsReceipts">
+              <span class="icon"
+                ><ion-icon name="return-up-back-outline"></ion-icon
+              ></span>
+              <span class="title">Refunds & Receipts</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Main Content -->
+      <div class="main">
+        <div class="topbar">
+          <div class="toggle"><ion-icon name="menu-outline"></ion-icon></div>
+          <div class="search">
+            <input
+              type="text"
+              id="globalSearch"
+              placeholder="Search sales..."
+            />
+            <ion-icon name="search-outline"></ion-icon>
+          </div>
+          <div class="user">
+            <img src="assets/imgs/customer01.jpg" alt="User Image" />
+          </div>
+        </div>
+        <div id="content-container">
+          <h2>Update Sale</h2>
+          <form id="updateSaleForm">
+            <div>
+              <label for="selectSale">Select Sale</label>
+              <select id="selectSale" required>
+                <!-- Options populated dynamically from /sales -->
+              </select>
+            </div>
+            <div>
+              <label for="saleStaff">Staff:</label>
+              <input
+                type="text"
+                id="saleStaff"
+                name="saleStaff"
+                list="staffList"
+                placeholder="Select staff"
+                required
+              />
+              <datalist id="staffList"></datalist>
+            </div>
+            <div>
+              <label for="saleStore">Store:</label>
+              <input
+                type="text"
+                id="saleStore"
+                name="saleStore"
+                list="storeList"
+                placeholder="Select store"
+                required
+              />
+              <datalist id="storeList"></datalist>
+            </div>
+            <div>
+              <label for="saleCustomer">Customer:</label>
+              <input
+                type="text"
+                id="saleCustomer"
+                name="saleCustomer"
+                list="customerList"
+                placeholder="Select customer"
+                required
+              />
+              <datalist id="customerList"></datalist>
+            </div>
+            <div>
+              <label for="totalAmount">Total Amount:</label>
+              <input
+                type="number"
+                id="totalAmount"
+                name="totalAmount"
+                min="0"
+                step="0.01"
+                required
+              />
+            </div>
+            <div>
+              <label for="paymentStatus">Payment Status:</label>
+              <select id="paymentStatus" name="paymentStatus">
+                <option value="pending">Pending</option>
+                <option value="paid">Paid</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+            <!-- Additional fields like receipt_number, refund_amount, refund_status are managed by backend -->
+            <button type="submit" class="btn">Update Sale</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Load sales for update
+      async function loadSalesForUpdate() {
+        try {
+          const response = await fetch("http://127.0.0.1:8000/sales/");
+          if (!response.ok) throw new Error("Failed to fetch sales");
+          const sales = await response.json();
+          const select = document.getElementById("selectSale");
+          select.innerHTML = "";
+          // Populate sale options with sale_id or receipt_number if available
+          sales.forEach((sale) => {
+            const option = document.createElement("option");
+            option.value = sale.sale_id;
+            option.textContent = sale.receipt_number
+              ? sale.receipt_number
+              : "Sale " + sale.sale_id;
+            select.appendChild(option);
+          });
+          loadSaleData(select.value);
+        } catch (error) {
+          console.error("Error loading sales:", error);
+        }
+      }
+
+      // Load sale data and populate the update form fields
+      async function loadSaleData(saleId) {
+        try {
+          const response = await fetch(`http://127.0.0.1:8000/sales/${saleId}`);
+          if (!response.ok) throw new Error("Failed to fetch sale data");
+          const sale = await response.json();
+          // Assume the backend returns staff, store, and customer IDs or names.
+          // Here we simply fill the inputs with the returned values.
+          document.getElementById("saleStaff").value = sale.staff_id || "";
+          document.getElementById("saleStore").value = sale.store_id || "";
+          document.getElementById("saleCustomer").value =
+            sale.customer_id || "";
+          document.getElementById("totalAmount").value = sale.total_amount;
+          document.getElementById("paymentStatus").value = sale.payment_status;
+          // Optionally load additional related data into datalists for staff, store, and customer.
+          loadStaffList();
+          loadStoreList();
+          loadCustomerList();
+        } catch (error) {
+          console.error("Error loading sale data:", error);
+        }
+      }
+
+      // Functions to load datalist options (staff, store, customer)
+      async function loadStaffList() {
+        try {
+          const response = await fetch("http://127.0.0.1:8000/staff/");
+          if (!response.ok) throw new Error("Failed to fetch staff");
+          const staff = await response.json();
+          const datalist = document.getElementById("staffList");
+          datalist.innerHTML = "";
+          staff.forEach((s) => {
+            const option = document.createElement("option");
+            option.value = s.staff_id;
+            option.textContent = s.full_name;
+            datalist.appendChild(option);
+          });
+        } catch (error) {
+          console.error("Error loading staff list:", error);
+        }
+      }
+
+      async function loadStoreList() {
+        try {
+          const response = await fetch("http://127.0.0.1:8000/stores/");
+          if (!response.ok) throw new Error("Failed to fetch stores");
+          const stores = await response.json();
+          const datalist = document.getElementById("storeList");
+          datalist.innerHTML = "";
+          stores.forEach((store) => {
+            const option = document.createElement("option");
+            option.value = store.store_id;
+            option.textContent = store.store_name;
+            datalist.appendChild(option);
+          });
+        } catch (error) {
+          console.error("Error loading store list:", error);
+        }
+      }
+
+      async function loadCustomerList() {
+        try {
+          const response = await fetch("http://127.0.0.1:8000/customers/");
+          if (!response.ok) throw new Error("Failed to fetch customers");
+          const customers = await response.json();
+          const datalist = document.getElementById("customerList");
+          datalist.innerHTML = "";
+          customers.forEach((cust) => {
+            const option = document.createElement("option");
+            option.value = cust.customer_id;
+            option.textContent = cust.full_name;
+            datalist.appendChild(option);
+          });
+        } catch (error) {
+          console.error("Error loading customer list:", error);
+        }
+      }
+
+      document
+        .getElementById("selectSale")
+        .addEventListener("change", function () {
+          loadSaleData(this.value);
+        });
+
+      document
+        .getElementById("updateSaleForm")
+        .addEventListener("submit", async function (e) {
+          e.preventDefault();
+          const saleId = document.getElementById("selectSale").value;
+          const saleStaff = document.getElementById("saleStaff").value.trim();
+          const saleStore = document.getElementById("saleStore").value.trim();
+          const saleCustomer = document
+            .getElementById("saleCustomer")
+            .value.trim();
+          const totalAmount = parseFloat(
+            document.getElementById("totalAmount").value
+          );
+          const paymentStatus = document.getElementById("paymentStatus").value;
+
+          const payload = {
+            staff_id: parseInt(saleStaff),
+            store_id: parseInt(saleStore),
+            customer_id: parseInt(saleCustomer),
+            total_amount: totalAmount,
+            payment_status: paymentStatus,
+          };
+
+          try {
+            const response = await fetch(
+              `http://127.0.0.1:8000/sales/${saleId}`,
+              {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              }
+            );
+            if (!response.ok) throw new Error("Failed to update sale");
+            alert("Sale updated successfully!");
+            window.location.href = "salesManagement.html";
+          } catch (error) {
+            console.error("Error updating sale:", error);
+            alert("Error updating sale.");
+          }
+        });
+
+      document.getElementById("backBtn").addEventListener("click", function () {
+        window.location.href = "salesManagement.html";
+      });
+
+      document.addEventListener("DOMContentLoaded", loadSalesForUpdate);
+
+      document.addEventListener("DOMContentLoaded", () => {
+        // Toggle submenu on click for items with the 'has-submenu' class.
+        document
+          .querySelectorAll(".navigation ul li.has-submenu > a")
+          .forEach((link) => {
+            link.addEventListener("click", (e) => {
+              e.preventDefault();
+              const parentLi = link.parentElement;
+              parentLi.classList.toggle("open");
+            });
+          });
+      });
+    </script>
+
+    <!-- Ionicons -->
+    <script
+      type="module"
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"
+    ></script>
+    <script
+      nomodule
+      src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"
+    ></script>
+  </body>
+</html>
