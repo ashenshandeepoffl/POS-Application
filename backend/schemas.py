@@ -383,7 +383,6 @@ class SalesUpdate(BaseModel): # Schema for updating existing sales (e.g., status
 # SaleItem Schemas
 # ---------------------------
 class SaleItemBase(BaseModel):
-    # Removed sale_id, usually set contextually
     item_id: int
     quantity: int = 1
     unit_price: Optional[float] = None # Price can come from Item or be overridden
@@ -391,12 +390,13 @@ class SaleItemBase(BaseModel):
     tax: Optional[float] = 0.00
 
 class SaleItemCreate(SaleItemBase):
-    # Used within process_sale payload
+    sale_id: int  # <<< --- ADD THIS LINE ---
+    # Used within process_sale payload and when calling POST /sale_items/ directly
     pass
 
 class SaleItemResponse(SaleItemBase):
     sale_item_id: int
-    sale_id: int # Include sale_id in response
+    sale_id: int # Also ensure sale_id is in the response schema
     unit_price: float # Make non-optional in response
     subtotal: float # The computed value from the model
 
@@ -405,7 +405,6 @@ class SaleItemResponse(SaleItemBase):
 
     class Config:
         orm_mode = True
-
 
 # ---------------------------
 # PaymentMethod Schemas

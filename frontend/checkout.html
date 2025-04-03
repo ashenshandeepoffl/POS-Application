@@ -4,8 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Modern POS Checkout</title>
+    <!-- Ensure correct path to your CSS -->
     <link rel="stylesheet" href="assets/css/checkout.css" />
-    <link rel="stylesheet" href="assets/css/nav.css" />
+    <!-- If you have a separate nav CSS, ensure it's linked -->
+    <!-- <link rel="stylesheet" href="assets/css/nav.css"> -->
+
     <!-- Ionicons for icons -->
     <script
       type="module"
@@ -15,6 +18,33 @@
       nomodule
       src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"
     ></script>
+    <style>
+      /* Basic Loading Indicator Style (optional) */
+      .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 3000; /* Ensure it's above modals */
+        font-size: 1.5em;
+        color: #333;
+      }
+      /* Basic Error Message Style (optional) */
+      #globalErrorDisplay {
+        background-color: #e74c3c;
+        color: white;
+        padding: 10px;
+        text-align: center;
+        margin-bottom: 15px;
+        border-radius: 4px;
+        display: none; /* Hidden by default */
+      }
+    </style>
   </head>
   <body>
     <!-- Topbar -->
@@ -28,6 +58,9 @@
       </button>
     </div>
 
+    <!-- Optional Global Error Display -->
+    <div id="globalErrorDisplay"></div>
+
     <!-- Main Container -->
     <div class="container">
       <!-- Left Sidebar: Categories -->
@@ -35,6 +68,7 @@
         <h2>Categories</h2>
         <ul id="categoryList">
           <!-- Categories loaded dynamically -->
+          <li>Loading...</li>
         </ul>
       </div>
 
@@ -50,6 +84,7 @@
         </div>
         <div class="product-list" id="productList">
           <!-- Products loaded dynamically -->
+          <p>Loading products...</p>
         </div>
       </div>
 
@@ -58,29 +93,32 @@
         <h2>Current Order</h2>
         <ul class="order-items" id="orderItems">
           <!-- Order items rendered here -->
+          <li class="no-items">No items in order</li>
         </ul>
         <div class="order-total" id="orderTotal">Total: Rs 0.00</div>
 
         <!-- Extras: Discount, Tax, Payment Method -->
         <div class="extras">
+          <label for="discountSelect">Discount:</label>
           <select id="discountSelect">
-            <option value="0">No Discount</option>
+            <option value="0" data-type="fixed_amount">No Discount</option>
             <!-- Discounts loaded dynamically -->
           </select>
+          <label for="taxSelect">Tax:</label>
           <select id="taxSelect">
             <option value="0">No Tax</option>
             <!-- Taxes loaded dynamically -->
           </select>
-          <!-- MODIFICATION 1 START: Payment Method Dropdown -->
+          <label for="paymentMethodSelect">Payment Method:</label>
           <select id="paymentMethodSelect">
             <option value="">Select Payment Method</option>
             <!-- Payment methods loaded dynamically -->
           </select>
-          <!-- MODIFICATION 1 END -->
         </div>
 
-        <!-- MODIFICATION 2 START: Customer Selection Section -->
+        <!-- Customer Selection Section -->
         <div class="customer-selection">
+          <label for="customerDisplay">Customer:</label>
           <input
             type="text"
             id="customerDisplay"
@@ -90,14 +128,14 @@
           />
           <input type="hidden" id="selectedCustomerId" />
         </div>
-        <!-- MODIFICATION 2 END -->
 
         <!-- Payment Section: Cash Received (triggers cash modal) -->
         <div class="payment-section">
+          <label for="cashReceived">Cash Received:</label>
           <input
             type="number"
             id="cashReceived"
-            placeholder="Cash Received (Rs)"
+            placeholder="Tap to Enter Cash Received"
             min="0"
             step="0.01"
             readonly
@@ -105,12 +143,12 @@
           />
           <div
             id="changeDisplay"
-            style="font-size: 16px; margin-bottom: 10px"
+            style="font-size: 16px; margin-top: 5px; min-height: 20px"
           ></div>
         </div>
 
         <!-- Action Buttons -->
-        <button class="checkout-btn" id="checkoutBtn">Checkout</button>
+        <button class="checkout-btn" id="checkoutBtn" disabled>Checkout</button>
         <button
           class="print-receipt-btn"
           id="printReceiptBtn"
@@ -118,14 +156,14 @@
         >
           Print Receipt
         </button>
-        <button class="btn" id="clearOrderBtn">Clear Order</button>
+        <button class="btn" id="clearOrderBtn" disabled>Clear Order</button>
       </div>
     </div>
 
     <!-- Modal: Product Detail & Quantity Input -->
     <div class="modal" id="productModal">
       <div class="modal-content">
-        <span class="close-modal" id="closeModal">&times;</span>
+        <span class="close-modal" onclick="closeProductModal()">×</span>
         <div class="modal-header">
           <h3 id="modalProductName">Product Name</h3>
           <p id="modalProductPrice">Price: Rs 0.00</p>
@@ -166,7 +204,7 @@
     <!-- Modal: Cash Received Input with Virtual Number Pad -->
     <div class="cash-modal" id="cashModal">
       <div class="cash-modal-content">
-        <span class="close-cash-modal" id="closeCashModal">&times;</span>
+        <span class="close-cash-modal" onclick="closeCashModal()">×</span>
         <div class="cash-display" id="cashDisplay">0.00</div>
         <div class="cash-number-pad">
           <button type="button" onclick="cashModalAppend('7')">7</button>
@@ -179,16 +217,18 @@
           <button type="button" onclick="cashModalAppend('2')">2</button>
           <button type="button" onclick="cashModalAppend('3')">3</button>
           <button type="button" onclick="cashModalAppend('0')">0</button>
+          <button type="button" onclick="cashModalAppend('.')">.</button>
+          <!-- Added Decimal -->
           <button type="button" onclick="cashModalBackspace()">⌫</button>
-          <button type="button" onclick="cashModalClear()">Clear</button>
+          <!-- Removed Clear button for simplicity, Backspace is enough -->
         </div>
         <button class="confirm-btn" onclick="confirmCashModal()">
-          Confirm
+          Confirm Cash
         </button>
       </div>
     </div>
 
-    <!-- MODIFICATION 2 START: Customer Search/Add Modal -->
+    <!-- Modal: Customer Search/Add -->
     <div class="modal" id="customerModal">
       <div class="modal-content customer-modal-content">
         <span class="close-modal" onclick="closeCustomerModal()">×</span>
@@ -242,15 +282,25 @@
 
         <div
           id="customerMessageArea"
-          style="margin-top: 10px; color: green; font-weight: bold"
+          style="
+            margin-top: 10px;
+            color: green;
+            font-weight: bold;
+            min-height: 20px;
+          "
         >
           <!-- Success/Error Messages -->
         </div>
       </div>
     </div>
-    <!-- MODIFICATION 2 END -->
+
+    <!-- Loading Overlay (Optional) -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none">
+      Processing...
+    </div>
 
     <script src="assets/js/checkout.js"></script>
-    <script src="assets/js/nav.js"></script>
+    <!-- If you have nav.js, ensure it's linked -->
+    <!-- <script src="assets/js/nav.js"></script> -->
   </body>
 </html>
