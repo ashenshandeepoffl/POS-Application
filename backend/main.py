@@ -1798,24 +1798,47 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 @app.post("/login", response_model=LoginResponse)
 def login(login_data: LoginSchema, db: Session = Depends(get_db)):
+    print(f"--- LOGIN ATTEMPT: Email='{login_data.email}' ---") # DEBUG
     staff = db.query(Staff).filter(Staff.email == login_data.email).first()
-    if not staff or staff.status != 'active': # Check if staff exists and is active
-        raise HTTPException(status_code=401, detail="Invalid email, password, or inactive account")
-    if not bcrypt.checkpw(login_data.password.encode('utf-8'), staff.password_hash.encode('utf-8')):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
 
+    if not staff:
+        print(f"--- LOGIN FAILED: Staff not found for email '{login_data.email}' ---") # DEBUG
+        raise HTTPException(status_code=401, detail="Invalid email, password, or inactive account")
+
+    print(f"--- LOGIN: Found staff - ID={staff.staff_id}, Name='{staff.full_name}', Status='{staff.status}' ---") # DEBUG
+
+    # Explicitly check status FIRST
+    # Compare the Enum's .value attribute to the string 'active'
+    if staff.status.value != 'active': # <<< CORRECTED LINE
+        print(f"--- LOGIN FAILED: Staff status is '{staff.status}' (value: '{staff.status.value}'), not 'active' ---") # Enhanced DEBUG
+        raise HTTPException(status_code=401, detail="Invalid email, password, or inactive account")
+    
+    # Now check password
+    password_bytes = login_data.password.encode('utf-8')
+    hash_bytes = staff.password_hash.encode('utf-8')
+    print(f"--- LOGIN: Comparing password. Raw length: {len(login_data.password)}, Hash from DB: {staff.password_hash[:10]}... ---") # DEBUG - Log length, don't log raw pw!
+
+    password_matches = bcrypt.checkpw(password_bytes, hash_bytes)
+    print(f"--- LOGIN: bcrypt.checkpw result: {password_matches} ---") # DEBUG
+
+    if not password_matches:
+        print(f"--- LOGIN FAILED: Password check failed for user '{login_data.email}' ---") # DEBUG
+        raise HTTPException(status_code=401, detail="Invalid email or password") # Specific message for password fail
+
+    # If checks pass, create token and return success
+    print(f"--- LOGIN SUCCESS: User '{login_data.email}' authenticated. Creating token... ---") # DEBUG
     access_token = create_access_token(
         data={
             "sub": staff.email,
             "staff_id": staff.staff_id,
-            "role": staff.role.value,
+            "role": staff.role.value, # Make sure role has a .value if it's an Enum
             "is_manager": staff.is_manager
             }
     )
     return LoginResponse(
         token=access_token,
         staff_id=staff.staff_id,
-        role=staff.role.value,
+        role=staff.role.value, # Use .value if Enum
         full_name=staff.full_name,
         is_manager=staff.is_manager
     )

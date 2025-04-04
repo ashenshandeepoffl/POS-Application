@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cashier Dashboard - POS</title>
+    <!-- Link Google Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Link Custom CSS -->
+    <link rel="stylesheet" href="assets/css/cashier-dashboard.css" />
+  </head>
+  <body>
+    <div class="main-container">
+      <header class="header-section">
+        <h1>Cashier Dashboard</h1>
+        <p id="cashier-name" class="welcome-message">Welcome!</p>
+      </header>
+
+      <!-- Date and Time Section -->
+      <section class="datetime-section card-style">
+        <div class="info-box">
+          <span class="label">Current Date</span>
+          <p id="current-date" class="value">-</p>
+        </div>
+        <div class="info-box">
+          <span class="label">Current Time</span>
+          <p id="current-time" class="value">-</p>
+        </div>
+      </section>
+
+      <!-- Actions Section -->
+      <main class="actions-section">
+        <a
+          href="cashierCheckout.html"
+          id="checkout-link"
+          class="action-button checkout-button"
+        >
+          <!-- Optional: Add an icon here if desired -->
+          <!-- <i class="icon-checkout"></i> -->
+          Go to Checkout
+        </a>
+        <button id="logout-button" class="action-button logout-button">
+          <!-- Optional: Add an icon here if desired -->
+          <!-- <i class="icon-logout"></i> -->
+          Logout
+        </button>
+      </main>
+    </div>
+
+    <footer class="footer">
+      POS System © <span id="current-year"></span> - All Rights Reserved
+    </footer>
+
+    <!-- Link Custom JS -->
+    <script src="assets/js/cashier-dashboard.js"></script>
+  </body>
+</html>

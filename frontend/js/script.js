@@ -23,22 +23,7 @@ document.addEventListener("DOMContentLoaded", () => {
         window.location.href = "dashboard.html";
       });
     }
-  
-    // LOGIN
-    const loginForm = document.getElementById("loginForm");
-    if (loginForm) {
-      loginForm.addEventListener("submit", (event) => {
-        event.preventDefault();
-        const email = document.getElementById("loginEmail").value.trim();
-        const password = document.getElementById("loginPassword").value;
-  
-        // Demo only
-        alert(`Logged in as: ${email}`);
-        window.location.href = "dashboard.html";
-      });
-    }
   });
-  
 
   document.addEventListener("DOMContentLoaded", () => {
     console.log("Dashboard Loaded");
@@ -111,49 +96,53 @@ document.addEventListener("DOMContentLoaded", () => {
           modal.classList.remove("show");
       }
   });
-});
-
+})
 
 document.addEventListener("DOMContentLoaded", function () {
   const loginForm = document.getElementById("loginForm");
-  
-  loginForm.addEventListener("submit", async function (e) {
-    e.preventDefault();
-    
-    const email = document.getElementById("loginEmail").value;
-    const password = document.getElementById("loginPassword").value;
-    
-    // Prepare the payload to send to the backend
-    const payload = {
-      email: email,
-      password: password
-    };
-    
-    try {
-      // Send a POST request to the login endpoint of your backend
-      const response = await fetch("http://127.0.0.1:8000/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Login successful:", data);
-        // Optionally store token or user info
-        localStorage.setItem("authToken", data.token);
-        // Redirect to your main dashboard or desired page
-        window.location.href = "dashboard.html";
-      } else {
-        const errorData = await response.json();
-        console.error("Login failed:", errorData.detail);
-        alert("Login failed: " + errorData.detail);
+
+  if (loginForm) {
+    loginForm.addEventListener("submit", async function (e) {
+      e.preventDefault();
+
+      const email = document.getElementById("loginEmail").value.trim();
+      const password = document.getElementById("loginPassword").value;
+
+      if (!email || !password) {
+        alert("Please enter both email and password.");
+        return;
       }
-    } catch (error) {
-      console.error("Error connecting to server:", error);
-      alert("Error connecting to server. Please try again later.");
-    }
-  });
+
+      try {
+        const response = await fetch("http://127.0.0.1:8000/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          alert("Login failed: " + (data.detail || "Invalid credentials"));
+          return;
+        }
+
+        // Token and user details
+        localStorage.setItem("authToken", data.token);
+        localStorage.setItem("userRole", data.role);
+        localStorage.setItem("isManager", data.is_manager);
+        localStorage.setItem("fullName", data.full_name);
+
+        // Correct redirection
+        if (data.is_manager || data.role.toLowerCase() === "Employee") {
+          window.location.href = "dashboard.html";
+        } else {
+          window.location.href = "cashiersDashboard.html";
+        }
+      } catch (error) {
+        console.error("Login error:", error);
+        alert("Server error. Please try again later.");
+      }
+    });
+  }
 });

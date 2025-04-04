@@ -459,38 +459,22 @@ function handleCategoryClick(clickedLi) {
     productSearchInput.value = ""; // Clear search when category changes
 }
 
+// Find the handleClearOrder function
 function handleClearOrder() {
     if (currentOrder.length === 0 && !cashReceivedInput.value && !customerDisplayInput.value && !selectedCustomerId) {
         console.log("Clear Order: Nothing to clear.");
         return; // Nothing to clear
     }
 
-
-    // Use confirm for web, consider Electron dialogs for desktop app feel
-    // const confirmed = confirm("Are you sure you want to clear the entire order and selections?");
-    // if (!confirmed) return;
-
-    // Example using Electron dialog (if in Electron context)
-    // const { dialog } = require('electron').remote; // Or use IPC
-    // const choice = dialog.showMessageBoxSync({
-    //     type: 'question',
-    //     buttons: ['Yes, Clear Order', 'Cancel'],
-    //     defaultId: 1, // Index of Cancel
-    //     title: 'Confirm Clear Order',
-    //     message: 'Are you sure you want to clear the current order, payment, and customer selection?'
-    // });
-    // if (choice === 1) return; // User cancelled
-
     // Using standard confirm for broader compatibility:
     if (!confirm("Are you sure you want to clear the entire order and selections?")) {
         return;
     }
 
-
     console.log("Clearing order...");
     currentOrder = [];
     selectedCustomerId = null;
-    lastOrderId = null; // Reset last order ID
+    // lastOrderId = null; // Resetting lastOrderId here might be okay, OR you could leave it until the next successful order overrides it. Let's leave it for now so print remains available until the next order starts.
 
     // Reset UI elements
     discountSelect.value = "0";
@@ -502,13 +486,19 @@ function handleClearOrder() {
     customerDisplayInput.value = "";
     customerModalInput = ""; // Reset customer modal input
     selectedCustomerIdInput.value = "";
-    printReceiptBtn.style.display = "none"; // Hide print button
-    printReceiptBtn.disabled = true; // Disable it too
+
+    // --- REMOVE OR COMMENT OUT THESE LINES ---
+    // printReceiptBtn.style.display = "none"; // Don't hide it here
+    // printReceiptBtn.disabled = true;      // Don't disable it here
+    // --- END OF REMOVAL ---
 
     renderOrder(); // Update the order display (shows "No items")
     updateCashModalDisplay(); // Reset cash display if modal was open
     updateCustomerModalDisplay(); // Reset customer phone display
     console.log("Order Cleared.");
+
+    // Optional: Re-focus the search input for the next order
+    productSearchInput.focus();
 }
 
 function handlePrintReceipt() {
@@ -1062,6 +1052,10 @@ function escapeSingleQuotes(str) {
 }
 
 
+// assets/js/checkout.js
+
+// ... (keep all existing variables, constants, and functions before handleCheckout) ...
+
 // ---------------------
 // Checkout Process Logic
 // ---------------------
@@ -1091,7 +1085,6 @@ async function handleCheckout() {
     console.log(`Payment Method Selected: ID=${selectedPaymentMethodId}, Name=${selectedPaymentMethodName}`);
 
     // 2. Sufficient Cash for Cash Payment?
-    // Using lowercase comparison for robustness
     if (selectedPaymentMethodName === 'cash') {
         console.log(`Cash Payment: Total=Rs ${finalTotal.toFixed(2)}, Received=Rs ${cashReceived.toFixed(2)}`);
         if (cashReceived < finalTotal) {
@@ -1102,48 +1095,52 @@ async function handleCheckout() {
         }
     } else {
         console.log(`Non-Cash Payment: Total=Rs ${finalTotal.toFixed(2)}`);
-        // For non-cash, assume payment covers the full amount (e.g., card terminal handles it)
     }
 
     // --- Prepare Data ---
-    // !! Replace placeholders with actual logged-in user/store context !!
-    // This usually comes from login state (e.g., localStorage, session storage, state management)
     const staffId = parseInt(localStorage.getItem('staff_id')) || 1; // Example: Get from localStorage, default 1
     const storeId = 1; // Example: Get from context if multi-store, default 1
     console.log(`Context: StaffID=${staffId}, StoreID=${storeId}, CustomerID=${selectedCustomerId || 'None'}`);
 
+    // Adjust Sale Data - Backend should calculate total and status
     const saleData = {
         staff_id: staffId,
         store_id: storeId,
         customer_id: selectedCustomerId || null,
-        // Backend should calculate total amount based on items + taxes/discounts applied there for consistency
-        // Sending calculated total from frontend can be risky, but we'll send it as info
-        total_amount: finalTotal, // Frontend calculated total (backend might recalculate)
-        payment_status: "paid",   // Assume paid on checkout success
-        receipt_number: null,     // Backend should generate this
+        total_amount: 0, // Let backend calculate based on items/tax/discount
+        payment_status: "pending", // Backend should update based on payment
+        receipt_number: null,
         refund_amount: 0.0,
         refund_status: "none"
-        // TODO: Add selected discount_id and tax_id if backend needs them at Sale level
+        // Add discount_id and tax_id if needed by backend at Sale level
+        // discount_id: parseInt(discountSelect.options[discountSelect.selectedIndex]?.dataset.id) || null,
+        // tax_id: parseInt(taxSelect.options[taxSelect.selectedIndex]?.dataset.id) || null,
     };
 
-    const saleItemsData = currentOrder.map(item => ({
-        item_id: item.product.item_id,
-        quantity: item.quantity,
-        unit_price: parseFloat(item.product.price) || 0,
-        discount: 0.0, // Simplification: Backend should apply chosen discount rule
-        tax: 0.0       // Simplification: Backend should apply chosen tax rule
-        // sale_id will be added after Sale creation
-    }));
+    const saleItemsData = currentOrder.map(item => {
+         const itemPrice = parseFloat(item.product.price) || 0;
+         const quantity = item.quantity;
+         // Simplification: Backend should calculate discount/tax per item based on rules
+         // For now, sending unit price and quantity.
+         return {
+            item_id: item.product.item_id,
+            quantity: quantity,
+            unit_price: itemPrice,
+            discount: 0.0, // Placeholder - Backend calculates
+            tax: 0.0       // Placeholder - Backend calculates
+         };
+    });
 
     // Amount for the payment record:
-    // For cash, it's the cash received. For others, it's the final total.
-    const paymentAmount = (selectedPaymentMethodName === 'cash') ? cashReceived : finalTotal;
+    // For cash, it's the total amount (change is handled separately). For others, it's the final total.
+    // Backend should ideally calculate this based on sale items.
+    // We send the expected final total for the payment record.
+    const paymentAmount = finalTotal;
 
     const paymentDataPayload = {
-        // sale_id will be added after Sale creation
         amount: paymentAmount,
         payment_method_id: parseInt(selectedPaymentMethodId),
-        transaction_reference: null // Add later if needed for card/digital payments
+        transaction_reference: null // Add later if needed
     };
 
     console.log("Checkout Data Prepared:");
@@ -1151,96 +1148,230 @@ async function handleCheckout() {
     console.log("Sale Items Data:", JSON.stringify(saleItemsData, null, 2));
     console.log("Payment Data Payload:", JSON.stringify(paymentDataPayload, null, 2));
 
-    showLoadingIndicators(true, "Processing Checkout..."); // Indicate processing
+    showLoadingIndicators(true, "Processing Checkout...");
+    let createdSaleId = null; // Initialize here
 
     // --- API Calls in Sequence ---
-    let createdSaleId = null;
     try {
+        // << --- OPTIONAL REFACTOR: Consider using /process_sale/ endpoint --- >>
+        // If your backend's /process_sale endpoint handles Sale, Items, Payment, and Stock in one go:
+        /*
+        const processSalePayload = {
+            sale_data: saleData,
+            sale_items: saleItemsData,
+            payments_data: [paymentDataPayload] // Send payment as a list
+        };
+        console.log("Attempting transactional sale via /process_sale/");
+        const processedSale = await fetchData(`${BASE_URL}/process_sale/`, {
+             method: "POST",
+             headers: { "Content-Type": "application/json" },
+             body: JSON.stringify(processSalePayload)
+        });
+        createdSaleId = processedSale.sale_id;
+        console.log(`Transactional Sale Processed: ID = ${createdSaleId}`);
+        // If using process_sale, skip the individual steps below
+        */
+
+        // << --- USING SEQUENTIAL CALLS (as per original code) --- >>
         // Step 1: Create the Sale Record
         console.log("Step 1: Creating Sale record...");
+        // Send data without calculated total/status - let backend do it
+        const salePayloadStep1 = {
+            staff_id: staffId,
+            store_id: storeId,
+            customer_id: selectedCustomerId || null,
+            // Add discount/tax IDs if applicable at sale level
+        };
         const newSale = await fetchData(`${BASE_URL}/sales/`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(saleData)
+            body: JSON.stringify(salePayloadStep1) // Send minimal data first
         });
-        createdSaleId = newSale.sale_id; // Store the crucial ID
+        createdSaleId = newSale.sale_id;
         console.log(`Sale Record Created: ID = ${createdSaleId}`);
 
-        // Step 2: Create Sale Items (Loop)
+        // Step 2: Create Sale Items (Loop) & Calculate Backend Total
         console.log(`Step 2: Creating ${saleItemsData.length} Sale Item record(s)...`);
         let itemErrors = [];
+        let backendCalculatedTotal = 0; // Recalculate based on added items if needed
         for (const itemData of saleItemsData) {
-            itemData.sale_id = createdSaleId; // Add the created sale_id
+            itemData.sale_id = createdSaleId;
             try {
-                await fetchData(`${BASE_URL}/sale_items/`, {
+                const addedItem = await fetchData(`${BASE_URL}/sale_items/`, { // Assuming endpoint adds and returns item details incl. subtotal
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(itemData)
                 });
-                 console.log(` -> Sale Item added successfully: Item ID ${itemData.item_id}`);
+                console.log(` -> Sale Item added successfully: Item ID ${itemData.item_id}`);
+                // Optional: Sum subtotals if backend returns them, useful for verifying payment amount
+                // backendCalculatedTotal += parseFloat(addedItem.subtotal || 0);
             } catch (itemError) {
                 console.error(`Failed to add item ID ${itemData.item_id} for Sale ID ${createdSaleId}:`, itemError);
                 itemErrors.push(`Item ID ${itemData.item_id}: ${itemError.message}`);
-                // Decide behavior: Continue processing other items or stop?
-                // Let's continue but report errors at the end.
+                // Decide behavior: Continue processing other items or stop? Let's continue.
             }
         }
+         // Optional: Update Sale with calculated total/discount/tax if backend requires it after items are added
+         // This step depends heavily on backend design. If /payments needs the final total,
+         // you might need a PUT /sales/{createdSaleId} here. Let's assume payment works without it for now.
 
         // Step 3: Create the Payment Record (Crucial)
         console.log("Step 3: Creating Payment record...");
-        paymentDataPayload.sale_id = createdSaleId; // Add sale_id to payment data
+        paymentDataPayload.sale_id = createdSaleId;
+        // Use the frontend calculated final total for the payment amount for now
+        paymentDataPayload.amount = finalTotal;
+
         try {
-            await fetchData(`${BASE_URL}/payments/`, { // Using /payments/ endpoint as per initial code
+            // Use SplitPayment endpoint if that's the standard now
+            await fetchData(`${BASE_URL}/split_payments/`, { // CHANGE TO /split_payments/
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(paymentDataPayload)
             });
-            console.log("Payment Record Created successfully.");
+            console.log("Payment Record Created successfully via SplitPayments.");
+            // Optionally update Sale status to 'paid' via PUT /sales/{id} if backend doesn't do it automatically
+            /*
+            try {
+                await fetchData(`${BASE_URL}/sales/${createdSaleId}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ payment_status: 'paid', total_amount: finalTotal }) // Update status and final total
+                });
+                console.log(`Sale ${createdSaleId} status updated to paid.`);
+            } catch (updateError) {
+                console.warn(`Failed to update sale status for ${createdSaleId}: ${updateError.message}`);
+            }
+            */
+
         } catch (paymentError) {
             console.error(`CRITICAL ERROR: Failed to create payment record for Sale ID ${createdSaleId}:`, paymentError);
-            // This is serious. The sale happened, items might be recorded, but payment isn't logged.
-            // Alert the user strongly. They need to manually verify/record this payment.
-            alert(`CRITICAL WARNING: Order ${createdSaleId} processed, but FAILED TO RECORD PAYMENT (${paymentError.message}). Please manually verify payment and contact support.`);
-            // Set lastOrderId so receipt *can* be printed for investigation, but warn user.
+            alert(`CRITICAL WARNING: Order ${createdSaleId} items recorded, but FAILED TO RECORD PAYMENT (${paymentError.message}). Please manually verify payment and contact support.`);
+            // Set lastOrderId for investigation, but warn user.
             lastOrderId = createdSaleId;
-            printReceiptBtn.style.display = "block";
-            printReceiptBtn.disabled = false;
-            showLoadingIndicators(false); // Hide loading
-            // Do NOT clear the order automatically here, leave it for manual check.
-            return; // Stop further processing like auto-clear
+            showLoadingIndicators(false);
+            // DO NOT clear the order automatically here.
+            return; // Stop further processing
         }
-
+        // << --- END OF SEQUENTIAL CALLS --- >>
 
         // --- Handle Final Outcome ---
-        lastOrderId = createdSaleId; // Store the ID for receipt printing on success
-        console.log(`Checkout successful for Sale ID: ${lastOrderId}`);
+        lastOrderId = createdSaleId; // Store the ID for receipt printing
+        console.log(`Checkout successfully processed Sale ID: ${lastOrderId}`);
 
+        // Handle item errors if any occurred during sequential add
         if (itemErrors.length > 0) {
-             // Sale and Payment succeeded, but some items failed.
-             alert(`Order ${lastOrderId} processed with payment recorded, but some items failed:\n\n- ${itemErrors.join("\n- ")}\n\nPlease review the sale details.`);
-             printReceiptBtn.style.display = "block"; // Allow printing receipt
-             printReceiptBtn.disabled = false;
-             handleClearOrder(); // Clear form for next sale, despite item errors
+             alert(`Order ${lastOrderId} processed with payment recorded, but some items failed to add:\n\n- ${itemErrors.join("\n- ")}\n\nPlease review the sale details manually.`);
         } else {
-            // Full success
-            alert(`Order ${lastOrderId} processed successfully!`);
-            printReceiptBtn.style.display = "block"; // Show print button
-            printReceiptBtn.disabled = false; // Enable print button
-             // Optional: Auto-print receipt?
-             // handlePrintReceipt();
-            handleClearOrder(); // Clear the form automatically after successful checkout
+             // Full success alert (optional, prompt replaces it)
+             // alert(`Order ${lastOrderId} processed successfully!`);
+             console.log("All steps successful.");
         }
+
+        // --- *** NEW: Prompt for Printing *** ---
+        const printConfirmed = confirm(`Order ${lastOrderId} successful! Print receipt?`);
+        if (printConfirmed) {
+            console.log("User confirmed print.");
+            handlePrintReceipt(); // Attempt to print
+        } else {
+            console.log("User declined print.");
+        }
+
+        // --- *** Clear Order AFTER Prompt *** ---
+        handleClearOrder(); // Clear the form for the next sale
 
     } catch (error) {
         console.error("Checkout process failed:", error);
-        // An error occurred, likely during Sale or Payment creation (or fetchData itself)
+        // Error likely during Sale creation or a critical Fetch error
         alert(`Error processing order: ${error.message || 'Unknown error occurred during checkout.'}`);
-        lastOrderId = null; // Ensure print button isn't active for failed order
-        printReceiptBtn.style.display = "none";
-        printReceiptBtn.disabled = true;
-         // Do not clear the order if checkout failed, allow user to retry or adjust.
+        lastOrderId = null; // Ensure print isn't possible for failed order
+        // Do not clear the order if checkout failed, allow user to retry or adjust.
     } finally {
-        showLoadingIndicators(false); // Hide processing indicator in all cases
+        showLoadingIndicators(false); // Hide processing indicator
         console.log("--- Checkout Process Ended ---");
     }
 }
+
+
+// Modify handlePrintReceipt to add pop-up blocker warning
+function handlePrintReceipt() {
+    if (!lastOrderId) {
+        console.warn("Print Receipt called but lastOrderId is null.");
+        // This alert might be redundant if called only after confirmation, but safe to keep
+        alert("No successfully completed order available to print receipt.");
+        return;
+    }
+    console.log(`Attempting to print receipt for Order ID: ${lastOrderId}`);
+    const url = `${BASE_URL}/sales/${lastOrderId}/receipt/pdf`;
+
+    const pdfWindow = window.open(url, "_blank");
+
+    // Check if window.open was potentially blocked
+    if (!pdfWindow || pdfWindow.closed || typeof pdfWindow.closed === 'undefined') {
+        console.warn("window.open might have been blocked by a pop-up blocker.");
+        alert("Could not open receipt window. Please check if your browser is blocking pop-ups for this site.");
+    } else {
+        console.log("Receipt window opened (or attempted).");
+        // Optional: focus the new window if possible
+        // pdfWindow.focus();
+    }
+
+    // We no longer manage the button visibility here as we use the prompt flow.
+}
+
+// Modify handleClearOrder to reset lastOrderId
+function handleClearOrder() {
+    if (currentOrder.length === 0 && !cashReceivedInput.value && !customerDisplayInput.value && !selectedCustomerId && lastOrderId === null) {
+        console.log("Clear Order: Nothing significant to clear.");
+        return; // Nothing significant to clear
+    }
+
+    // Confirmation is good practice if clearing non-empty state
+    if (currentOrder.length > 0 || cashReceivedInput.value || selectedCustomerId) {
+        if (!confirm("Are you sure you want to clear the current order state?")) {
+            return;
+        }
+    }
+
+    console.log("Clearing order state...");
+    currentOrder = [];
+    selectedCustomerId = null;
+    lastOrderId = null; // *** ADD THIS: Reset the ID for printing ***
+
+    // Reset UI elements
+    discountSelect.value = "0";
+    taxSelect.value = "0";
+    paymentMethodSelect.value = "";
+    cashReceivedInput.value = "";
+    cashModalInput = "";
+    changeDisplay.innerText = "";
+    changeDisplay.style.color = 'inherit'; // Reset color
+    customerDisplayInput.value = "";
+    customerModalInput = "";
+    selectedCustomerIdInput.value = "";
+    customerMessageArea.textContent = "";
+    customerResultsArea.innerHTML = "";
+    addCustomerSection.style.display = "none";
+    newCustomerNameInput.value = "";
+    newCustomerEmailInput.value = "";
+
+    // Reset buttons to initial state (Checkout/Clear enabled, Print disabled/hidden)
+    checkoutBtn.disabled = false;
+    clearOrderBtn.disabled = false; // Or disable if order is truly empty now
+    printReceiptBtn.style.display = "none"; // Hide print button again
+    printReceiptBtn.disabled = true;
+
+    renderOrder(); // Update the order display (shows "No items")
+    updateCashModalDisplay();
+    updateCustomerModalDisplay();
+    console.log("Order State Cleared.");
+
+    productSearchInput.focus(); // Focus search for next order
+}
+
+
+// ... (keep all other functions like fetchData, debounce, loadCategories, loadProducts, render functions, modal functions, etc.) ...
+
+// Make sure initialization calls the modified functions correctly
+document.addEventListener('DOMContentLoaded', initializeCheckout);
+
+// ... (rest of the file remains the same) ...
