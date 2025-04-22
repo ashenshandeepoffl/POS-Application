@@ -18,33 +18,7 @@
       nomodule
       src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"
     ></script>
-    <style>
-      /* Basic Loading Indicator Style (optional) */
-      .loading-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(255, 255, 255, 0.7);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 3000; /* Ensure it's above modals */
-        font-size: 1.5em;
-        color: #333;
-      }
-      /* Basic Error Message Style (optional) */
-      #globalErrorDisplay {
-        background-color: #e74c3c;
-        color: white;
-        padding: 10px;
-        text-align: center;
-        margin-bottom: 15px;
-        border-radius: 4px;
-        display: none; /* Hidden by default */
-      }
-    </style>
+    <!-- Removed inline styles, handled in checkout.css now -->
   </head>
   <body>
     <!-- Topbar -->
@@ -84,7 +58,8 @@
         </div>
         <div class="product-list" id="productList">
           <!-- Products loaded dynamically -->
-          <p>Loading products...</p>
+          <p class="no-products-message">Loading products...</p>
+          <!-- Added class -->
         </div>
       </div>
 
@@ -95,18 +70,28 @@
           <!-- Order items rendered here -->
           <li class="no-items">No items in order</li>
         </ul>
-        <div class="order-total" id="orderTotal">Total: Rs 0.00</div>
+        <div class="order-totals-breakdown">
+          <!-- Added wrapper for totals -->
+          <p id="subtotalDisplay">Subtotal: <span>Rs 0.00</span></p>
+          <p id="discountDisplay">Discount: <span>- Rs 0.00</span></p>
+          <p id="taxDisplay">Tax: <span>+ Rs 0.00</span></p>
+          <div class="order-total" id="orderTotal">Total: Rs 0.00</div>
+        </div>
 
         <!-- Extras: Discount, Tax, Payment Method -->
         <div class="extras">
           <label for="discountSelect">Discount:</label>
           <select id="discountSelect">
-            <option value="0" data-type="fixed_amount">No Discount</option>
+            <option value="0" data-type="fixed_amount" data-id="0">
+              No Discount
+            </option>
+            <!-- Added data-id -->
             <!-- Discounts loaded dynamically -->
           </select>
           <label for="taxSelect">Tax:</label>
           <select id="taxSelect">
-            <option value="0">No Tax</option>
+            <option value="0" data-id="0">No Tax</option>
+            <!-- Added data-id -->
             <!-- Taxes loaded dynamically -->
           </select>
           <label for="paymentMethodSelect">Payment Method:</label>
@@ -141,10 +126,7 @@
             readonly
             onclick="openCashModal()"
           />
-          <div
-            id="changeDisplay"
-            style="font-size: 16px; margin-top: 5px; min-height: 20px"
-          ></div>
+          <div id="changeDisplay"></div>
         </div>
 
         <!-- Action Buttons -->
@@ -153,10 +135,14 @@
           class="print-receipt-btn"
           id="printReceiptBtn"
           style="display: none"
+          disabled
         >
           Print Receipt
         </button>
-        <button class="btn" id="clearOrderBtn" disabled>Clear Order</button>
+        <button class="clear-order-btn" id="clearOrderBtn" disabled>
+          Clear Order
+        </button>
+        <!-- Changed class -->
       </div>
     </div>
 
@@ -189,7 +175,8 @@
           <div class="modal-right">
             <div class="summary">
               <p>Quantity: <span id="modalQuantity">0</span></p>
-              <p style="font-size: 26px; font-weight: bold">
+              <p class="modal-total-label">
+                <!-- Added class -->
                 Total: Rs <span id="modalTotal">0.00</span>
               </p>
             </div>
@@ -218,9 +205,7 @@
           <button type="button" onclick="cashModalAppend('3')">3</button>
           <button type="button" onclick="cashModalAppend('0')">0</button>
           <button type="button" onclick="cashModalAppend('.')">.</button>
-          <!-- Added Decimal -->
           <button type="button" onclick="cashModalBackspace()">⌫</button>
-          <!-- Removed Clear button for simplicity, Backspace is enough -->
         </div>
         <button class="confirm-btn" onclick="confirmCashModal()">
           Confirm Cash
@@ -257,44 +242,34 @@
           <!-- Search results or 'Not Found' message appear here -->
         </div>
 
-        <div
-          id="addCustomerSection"
-          style="display: none; margin-top: 15px; width: 100%"
-        >
+        <div id="addCustomerSection">
+          <!-- Removed inline style -->
           <h4>Add New Customer</h4>
           <input
             type="text"
             id="newCustomerNameInput"
             placeholder="Full Name"
-            style="width: 100%; padding: 8px; margin-bottom: 10px"
           />
-          <!-- Phone number is taken from the search input -->
+          <!-- Removed inline style -->
           <input
             type="email"
             id="newCustomerEmailInput"
             placeholder="Email (Optional)"
-            style="width: 100%; padding: 8px; margin-bottom: 10px"
           />
+          <!-- Removed inline style -->
           <button class="action-btn add-btn" onclick="addCustomer()">
             Add Customer
           </button>
         </div>
 
-        <div
-          id="customerMessageArea"
-          style="
-            margin-top: 10px;
-            color: green;
-            font-weight: bold;
-            min-height: 20px;
-          "
-        >
+        <div id="customerMessageArea">
+          <!-- Removed inline style -->
           <!-- Success/Error Messages -->
         </div>
       </div>
     </div>
 
-    <!-- Loading Overlay (Optional) -->
+    <!-- Loading Overlay -->
     <div id="loadingOverlay" class="loading-overlay" style="display: none">
       Processing...
     </div>

@@ -15,13 +15,14 @@ from models import (
     Sales, SaleItem, Payment, RolePermission, UserRole, Attendance, SalesReport,
     Discount, Tax, AuditLog, PaymentMethod, SplitPayment, StockHistory,
     DiscountsApplied, TaxesApplied, SalesReportItem, Supplier,
-    PurchaseOrder, PurchaseOrderItem
+    PurchaseOrder, PurchaseOrderItem,PaymentStatusEnum
 )
 from schemas import (
     RoleCreate, RoleResponse,
     PermissionCreate, PermissionResponse,
     CategoryCreate, CategoryResponse,
     ItemCreate, ItemResponse,
+    ItemWithStockResponse,
     CustomerCreate, CustomerResponse,
     StaffCreate, StaffResponse, StaffUpdate,
     StoreCreate, StoreResponse,
@@ -44,8 +45,9 @@ from schemas import (
     SalesReportItemCreate, SalesReportItemResponse,
     SupplierCreate, SupplierResponse,
     PurchaseOrderCreate, PurchaseOrderResponse,
-    PurchaseOrderItemCreate, PurchaseOrderItemResponse, 
-    LowStockItemResponse, RecentSaleResponse
+    PurchaseOrderItemCreate, PurchaseOrderItemResponse,
+    LowStockItemResponse, RecentSaleResponse,
+    ProcessSalePayload
 )
 import jwt # Moved JWT import higher for consistency
 from pydantic import BaseModel, EmailStr # Moved Pydantic import higher
@@ -256,11 +258,22 @@ def delete_category(category_id: int, db: Session = Depends(get_db)):
     db.commit()
     return None
 
+## ================================
+# CRUD Endpoints for Items (FULLY COMPLETED)
 # ================================
-# CRUD Endpoints for Items
-# ================================
-@app.post("/items/", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
-def create_item(item: ItemCreate, db: Session = Depends(get_db)):
+
+@app.post("/items/", response_model=ItemResponse, status_code=status.HTTP_201_CREATED, tags=["Items"])
+async def create_item(item: ItemCreate, db: Session = Depends(get_db)):
+    """
+    Creates a new item in the database.
+    """
+    # Optional: Check if barcode already exists
+    if item.barcode:
+        existing_item = db.query(Item).filter(Item.barcode == item.barcode).first()
+        if existing_item:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail=f"Item with barcode '{item.barcode}' already exists.")
+
     db_item = Item(
         item_name=item.item_name,
         category_id=item.category_id,
@@ -270,65 +283,151 @@ def create_item(item: ItemCreate, db: Session = Depends(get_db)):
         is_perishable=item.is_perishable,
         image_url=item.image_url
     )
-    db.add(db_item)
-    db.commit()
-    db.refresh(db_item)
-    return db_item
+    try:
+        db.add(db_item)
+        db.commit()
+        db.refresh(db_item)
+        return db_item
+    except Exception as e:
+        db.rollback()
+        print(f"Error creating item: {e}") # Basic logging
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f"Could not create item: {e}")
 
-@app.get("/items/", response_model=List[ItemResponse])
-def get_items(
-    category_id: Optional[int] = None, # <<< ADD category_id parameter here
+@app.get("/items/", response_model=List[ItemWithStockResponse], tags=["Items"])
+async def get_items(
+    category_id: Optional[int] = Query(None, description="Filter items by category ID"),
+    store_id: int = Query(1, description="Specify the store ID to get stock levels for"), # IMPORTANT: Get this from user context in a real app
     db: Session = Depends(get_db)
 ):
-    query = db.query(Item).options(joinedload(Item.category)) # Eager load category for context if needed
+    """
+    Retrieves a list of items, optionally filtered by category,
+    including the stock quantity for the specified store.
+    """
+    try:
+        # Base query for Item
+        query = db.query(
+            Item,
+            # Use outerjoin for stock in case an item has no stock record yet in this store
+            # Select the quantity from the specific store, default to 0 if no record
+            func.coalesce(Stock.quantity, 0).label("stock_quantity"),
+            # Optionally include min_stock_level if needed in the response/frontend
+            Stock.min_stock_level.label("min_stock_level")
+        ).outerjoin(
+            Stock,
+             # Join Item.item_id with Stock.item_id AND filter by the specific store_id
+             and_(Item.item_id == Stock.item_id, Stock.store_id == store_id)
+        ).options(joinedload(Item.category)) # Eager load category for potential display
 
-    # --- ADD Filtering Logic ---
-    if category_id is not None: # Use 'is not None' to allow filtering for category_id=0 if valid
-        query = query.filter(Item.category_id == category_id)
-    # --- End Filtering Logic ---
+        # Apply Category Filtering
+        if category_id is not None:
+            query = query.filter(Item.category_id == category_id)
 
-    # Consider adding sorting (e.g., by name) and pagination here
-    items = query.order_by(Item.item_name).all()
-    return items
+        # Consider adding item status filtering if applicable
+        # query = query.filter(Item.status == 'active')
 
-@app.get("/items/{item_id}", response_model=ItemResponse)
-def get_item(item_id: int, db: Session = Depends(get_db)):
-    item = db.query(Item).filter(Item.item_id == item_id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
-    return item
+        # Execute the query
+        results = query.order_by(Item.item_name).all()
 
-@app.put("/items/{item_id}", response_model=ItemResponse)
-def update_item(item_id: int, item_update: ItemCreate, db: Session = Depends(get_db)):
-    item = db.query(Item).filter(Item.item_id == item_id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
-    item.item_name = item_update.item_name
-    item.category_id = item_update.category_id
-    item.price = item_update.price
-    item.cost_price = item_update.cost_price
-    item.barcode = item_update.barcode
-    item.is_perishable = item_update.is_perishable
-    item.image_url = item_update.image_url
-    db.commit()
-    db.refresh(item)
-    return item
+        # Format the response to match ItemWithStockResponse
+        response_items = []
+        for item, quantity, min_stock in results:
+            # Convert SQLAlchemy model instance to a dictionary suitable for Pydantic
+            # Accessing __dict__ can sometimes include SQLAlchemy internal state,
+            # so it's often safer to explicitly map fields if issues arise.
+            item_data = {
+                "item_id": item.item_id,
+                "item_name": item.item_name,
+                "category_id": item.category_id,
+                "price": item.price,
+                "cost_price": item.cost_price,
+                "barcode": item.barcode,
+                "is_perishable": item.is_perishable,
+                "image_url": item.image_url,
+                "created_at": item.created_at,
+                "updated_at": item.updated_at,
+                "quantity": quantity, # Add the fetched stock quantity
+                "min_stock_level": min_stock # Add min_stock_level
+            }
+            response_items.append(item_data)
 
-@app.delete("/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_item(item_id: int, db: Session = Depends(get_db)):
-    item = db.query(Item).filter(Item.item_id == item_id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
-    db.delete(item)
-    db.commit()
-    return None
+        return response_items
+    except Exception as e:
+        print(f"Error fetching items with stock: {e}") # Basic logging
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f"Could not retrieve items: {e}")
 
-@app.get("/items/barcode/{barcode}", response_model=ItemResponse)
-def get_item_by_barcode(barcode: str, db: Session = Depends(get_db)):
-    item = db.query(Item).filter(Item.barcode == barcode).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Item not found for given barcode")
-    return item
+@app.get("/items/{item_id}", response_model=ItemResponse, tags=["Items"])
+async def get_item(item_id: int, db: Session = Depends(get_db)):
+    """
+    Retrieves a specific item by its ID.
+    """
+    db_item = db.query(Item).filter(Item.item_id == item_id).first()
+    if db_item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+    return db_item
+
+@app.put("/items/{item_id}", response_model=ItemResponse, tags=["Items"])
+async def update_item(item_id: int, item_update: ItemCreate, db: Session = Depends(get_db)):
+    """
+    Updates an existing item by its ID.
+    """
+    db_item = db.query(Item).filter(Item.item_id == item_id).first()
+    if db_item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+
+    # Optional: Check barcode uniqueness if changed
+    if item_update.barcode and item_update.barcode != db_item.barcode:
+        existing_barcode = db.query(Item).filter(Item.barcode == item_update.barcode, Item.item_id != item_id).first()
+        if existing_barcode:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail=f"Barcode '{item_update.barcode}' is already in use by another item.")
+
+    # Update fields from the request data
+    update_data = item_update.dict(exclude_unset=True) # exclude_unset prevents overwriting with None if not provided
+    for key, value in update_data.items():
+        setattr(db_item, key, value)
+
+    try:
+        db.commit()
+        db.refresh(db_item)
+        return db_item
+    except Exception as e:
+        db.rollback()
+        print(f"Error updating item {item_id}: {e}") # Basic logging
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f"Could not update item: {e}")
+
+@app.delete("/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Items"])
+async def delete_item(item_id: int, db: Session = Depends(get_db)):
+    """
+    Deletes an item by its ID.
+    Note: Ensure database constraints (e.g., ON DELETE behavior for related tables like Stock, SaleItem) are set appropriately.
+    """
+    db_item = db.query(Item).filter(Item.item_id == item_id).first()
+    if db_item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+
+    try:
+        db.delete(db_item)
+        db.commit()
+        return None # Return None for 204 No Content response
+    except Exception as e:
+        db.rollback()
+        # Check for specific constraint violation errors if needed
+        print(f"Error deleting item {item_id}: {e}") # Basic logging
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f"Could not delete item. It might be referenced in sales or purchase orders: {e}")
+
+@app.get("/items/barcode/{barcode}", response_model=ItemResponse, tags=["Items"])
+async def get_item_by_barcode(barcode: str, db: Session = Depends(get_db)):
+    """
+    Retrieves a specific item by its barcode.
+    """
+    db_item = db.query(Item).filter(Item.barcode == barcode).first()
+    if db_item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found for given barcode")
+    return db_item
 
 # ================================
 # CRUD Endpoints for Customers
@@ -692,115 +791,170 @@ def delete_sales(sale_id: int, db: Session = Depends(get_db)):
     db.commit()
     return None
 
-# Process Sale (Simplified - assumes items are passed correctly)
-# TODO: Consider making this transactional
-@app.post("/process_sale/", response_model=SalesResponse) # Changed PUT to POST as it creates resources
-def process_sale(sale_data: SalesCreate, sale_items: List[SaleItemCreate], payments_data: List[PaymentCreate], db: Session = Depends(get_db)):
-    # 1. Create the Sale record
-    db_sale = Sales(**sale_data.dict())
-    db.add(db_sale)
-    db.commit()
-    db.refresh(db_sale)
+# --- MODIFIED Endpoint ---
+@app.post("/process_sale/", response_model=SalesResponse, tags=["Sales"])
+async def process_sale(payload: ProcessSalePayload, db: Session = Depends(get_db)): # <<< CHANGED: Accept single payload argument
+    """
+    Processes a complete sale transaction, including creating the sale record,
+    adding sale items, processing payments, and updating stock.
+    """
+    # Access data from the payload object
+    sale_data = payload.sale_data
+    sale_items = payload.sale_items
+    payments_data = payload.payments_data
 
-    total_calculated_amount = 0.0
-    total_tax_calculated = 0.0
-    total_discount_calculated = 0.0
+    # --- Start Transaction (Optional but Recommended) ---
+    # db.begin() # Start transaction manually if needed, requires careful error handling
 
-    # 2. Process Sale Items and Update Stock
-    for item_data in sale_items:
-        # Verify item exists
-        item = db.query(Item).filter(Item.item_id == item_data.item_id).first()
-        if not item:
-             db.rollback() # Rollback sale creation
-             raise HTTPException(status_code=404, detail=f"Item with ID {item_data.item_id} not found")
-
-        # Use item's current price if not provided in request (or validate if provided)
-        unit_price = item_data.unit_price if item_data.unit_price is not None else item.price
-        if unit_price is None: # Ensure price is set
-             db.rollback()
-             raise HTTPException(status_code=400, detail=f"Price not set for item {item.item_name}")
-
-        subtotal = item_data.quantity * float(unit_price)
-        # TODO: Add logic for applying discounts/taxes based on rules if needed
-        tax_amount = item_data.tax if item_data.tax is not None else 0.0 # Example default
-        discount_amount = item_data.discount if item_data.discount is not None else 0.0 # Example default
-
-        item_total = subtotal - discount_amount + tax_amount
-        total_calculated_amount += item_total
-        total_tax_calculated += tax_amount
-        total_discount_calculated += discount_amount
-
-        db_sale_item = SaleItem(
-            sale_id=db_sale.sale_id,
-            item_id=item_data.item_id,
-            quantity=item_data.quantity,
-            unit_price=unit_price,
-            discount=discount_amount,
-            tax=tax_amount
-            # subtotal is computed
+    try:
+        # 1. Create the Sale record (Minimal initial data)
+        db_sale = Sales(
+            staff_id=sale_data.staff_id,
+            store_id=sale_data.store_id,
+            customer_id=sale_data.customer_id,
+            payment_status='pending' # Start as pending
+            # total_amount will be calculated and updated later
         )
-        db.add(db_sale_item)
+        db.add(db_sale)
+        db.flush() # Flush to get the sale_id before adding items/payments
+        print(f"Sale record created with tentative ID: {db_sale.sale_id}")
 
-        # Decrement stock
-        stock_record = db.query(Stock).filter(
-            Stock.store_id == db_sale.store_id,
-            Stock.item_id == item_data.item_id
-        ).with_for_update().first() # Lock row for update
+        total_calculated_amount = 0.0
+        total_tax_calculated = 0.0
+        total_discount_calculated = 0.0
 
-        if not stock_record or stock_record.quantity < item_data.quantity:
-            db.rollback() # Rollback sale and items
-            raise HTTPException(status_code=400, detail=f"Insufficient stock for item {item.item_name} (ID: {item_data.item_id})")
+        # 2. Process Sale Items and Update Stock
+        for item_data in sale_items:
+            # Verify item exists
+            item = db.query(Item).filter(Item.item_id == item_data.item_id).first()
+            if not item:
+                # db.rollback() # Rollback if using manual transaction
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                    detail=f"Item with ID {item_data.item_id} not found")
 
-        old_stock_qty = stock_record.quantity
-        stock_record.quantity -= item_data.quantity
-        db.add(stock_record)
+            # Use item's current price if not provided, or validate if provided
+            unit_price = item_data.unit_price if item_data.unit_price is not None else item.price
+            if unit_price is None:
+                # db.rollback()
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                    detail=f"Price not set for item {item.item_name} (ID: {item_data.item_id})")
+            unit_price = float(unit_price) # Ensure float
 
-        # --- Add Stock History ---
-        history_entry = StockHistory(
-            stock_id=stock_record.stock_id,
-            quantity_change=-item_data.quantity,
-            change_type='removal',
-            reason=f'Sale ID: {db_sale.sale_id}'
-        )
-        db.add(history_entry)
-        # ---
+            # Calculate amounts for this line item
+            # These might be simple placeholders if complex rules apply globally
+            tax_amount = float(item_data.tax or 0.0)
+            discount_amount = float(item_data.discount or 0.0)
+            subtotal = item_data.quantity * unit_price
+            item_final_total = subtotal - discount_amount + tax_amount
 
-    # 3. Update Sale with calculated total
-    db_sale.total_amount = total_calculated_amount
-    # db_sale.total_tax = total_tax_calculated # Add these fields to Sales model if needed
-    # db_sale.total_discount = total_discount_calculated # Add these fields to Sales model if needed
+            # Accumulate overall totals
+            total_calculated_amount += item_final_total
+            total_tax_calculated += tax_amount
+            total_discount_calculated += discount_amount
 
-    # 4. Process Payments (Handle Split Payments)
-    total_paid = 0.0
-    for payment_data in payments_data:
-        # Validate payment method
-        pm = db.query(PaymentMethod).filter(PaymentMethod.payment_method_id == payment_data.payment_method_id).first()
-        if not pm:
-            db.rollback()
-            raise HTTPException(status_code=400, detail=f"Invalid Payment Method ID: {payment_data.payment_method_id}")
+            db_sale_item = SaleItem(
+                sale_id=db_sale.sale_id,
+                item_id=item_data.item_id,
+                quantity=item_data.quantity,
+                unit_price=unit_price,
+                discount=discount_amount,
+                tax=tax_amount
+                # subtotal is computed property in model
+            )
+            db.add(db_sale_item)
+            print(f" -> Added SaleItem for Item ID {item_data.item_id}")
 
-        db_payment = SplitPayment( # Using SplitPayment model to store each part
-             sale_id=db_sale.sale_id,
-             amount=payment_data.amount,
-             payment_method_id=payment_data.payment_method_id,
-             transaction_reference=payment_data.transaction_reference
-        )
-        db.add(db_payment)
-        total_paid += payment_data.amount
+            # Decrement stock (lock row for update)
+            stock_record = db.query(Stock).filter(
+                Stock.store_id == db_sale.store_id,
+                Stock.item_id == item_data.item_id
+            ).with_for_update().first()
 
-    # 5. Update Payment Status
-    # Using a small tolerance for floating point comparison
-    if abs(total_paid - total_calculated_amount) < 0.01:
-         db_sale.payment_status = 'paid'
-    elif total_paid > 0:
-         db_sale.payment_status = 'pending' # Or introduce 'partially_paid' status
-    else:
-         db_sale.payment_status = 'pending'
+            if not stock_record or stock_record.quantity < item_data.quantity:
+                # db.rollback()
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                    detail=f"Insufficient stock for item '{item.item_name}' (ID: {item_data.item_id}). Required: {item_data.quantity}, Available: {stock_record.quantity if stock_record else 0}")
 
-    db.add(db_sale) # Add again to save changes to total_amount and payment_status
-    db.commit() # Commit transaction
-    db.refresh(db_sale)
-    return db_sale
+            old_stock_qty = stock_record.quantity
+            stock_record.quantity -= item_data.quantity
+            db.add(stock_record) # Mark for update
+            print(f" -> Stock updated for Item ID {item_data.item_id}: {old_stock_qty} -> {stock_record.quantity}")
+
+            # --- Add Stock History ---
+            history_entry = StockHistory(
+                stock_id=stock_record.stock_id,
+                quantity_change=-item_data.quantity,
+                change_type='removal',
+                reason=f'Sale ID: {db_sale.sale_id}'
+            )
+            db.add(history_entry)
+            # ---
+
+        # 3. Update Sale with calculated total and potentially tax/discount totals
+        db_sale.total_amount = total_calculated_amount
+        # Optional: If you add these fields to the Sales model:
+        # db_sale.total_tax = total_tax_calculated
+        # db_sale.total_discount = total_discount_calculated
+        print(f"Sale totals calculated: Amount={total_calculated_amount}, Tax={total_tax_calculated}, Discount={total_discount_calculated}")
+
+
+        # 4. Process Payments (Handle Split Payments using SplitPayment model)
+        total_paid = 0.0
+        for payment_data in payments_data:
+            # Validate payment method
+            pm = db.query(PaymentMethod).filter(PaymentMethod.payment_method_id == payment_data.payment_method_id).first()
+            if not pm:
+                # db.rollback()
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                    detail=f"Invalid Payment Method ID: {payment_data.payment_method_id}")
+
+            payment_amount = float(payment_data.amount or 0.0)
+            db_payment = SplitPayment( # Use SplitPayment model
+                 sale_id=db_sale.sale_id,
+                 amount=payment_amount,
+                 payment_method_id=payment_data.payment_method_id,
+                 transaction_reference=payment_data.transaction_reference # Use field from PaymentCreate
+            )
+            db.add(db_payment)
+            total_paid += payment_amount
+            print(f" -> Added SplitPayment: Amount={payment_amount}, MethodID={payment_data.payment_method_id}")
+
+
+        # 5. Update Final Payment Status
+        # Use a small tolerance for floating point comparison
+        if abs(total_paid - total_calculated_amount) < 0.01:
+            db_sale.payment_status = PaymentStatusEnum.paid # <<< USE ENUM MEMBER
+        elif total_paid > 0 and total_paid < total_calculated_amount:
+            db_sale.payment_status = PaymentStatusEnum.partially_paid # <<< USE ENUM MEMBER
+        elif total_paid == 0:
+            db_sale.payment_status = PaymentStatusEnum.pending # <<< USE ENUM MEMBER
+        elif total_paid > total_calculated_amount:
+            db_sale.payment_status = PaymentStatusEnum.paid # <<< USE ENUM MEMBER (Overpaid is still paid)
+            print(f"Note: Overpayment detected. Total={total_calculated_amount}, Paid={total_paid}")
+        else: # Should not happen if checks are correct
+            db_sale.payment_status = PaymentStatusEnum.pending # <<< USE ENUM MEMBER
+
+        # This print statement will now work correctly
+        print(f"Final Payment Status set to: {db_sale.payment_status.value}")
+
+        db.add(db_sale) # Ensure final updates to sale record are saved
+        db.commit() # Commit the entire transaction
+        db.refresh(db_sale) # Refresh to get final state from DB
+        print(f"Sale ID {db_sale.sale_id} processed and committed successfully.")
+        return db_sale
+
+    except Exception as e:
+        print(f"ERROR during process_sale for Sale ID {db_sale.sale_id if 'db_sale' in locals() else 'N/A'}: {e}")
+        db.rollback() # Rollback ALL changes on any error
+        # Re-raise HTTPException if it's already one, otherwise wrap generic errors
+        if isinstance(e, HTTPException):
+            raise e
+        else:
+             # Log the traceback for detailed debugging
+             import traceback
+             traceback.print_exc()
+             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                detail=f"An internal error occurred during sale processing: {e}")
 
 
 # ================================
@@ -2124,160 +2278,260 @@ def global_search(q: str = Query(..., min_length=2), db: Session = Depends(get_d
 
     return suggestions[:limit] # Ensure total limit isn't exceeded
 
-# ================================
-# Receipt and PDF Endpoints
-# ================================
-# (Keep existing generate_receipt and get_receipt_pdf)
-# ... existing endpoints ...
-@app.get("/sales/{sale_id}/receipt", response_model=dict)
-def generate_receipt(sale_id: int, db: Session = Depends(get_db)):
-    # Eager load related data
+# ===================================================================
+# Receipt and PDF Endpoints (REVISED AND COMPLETED)
+# ===================================================================
+
+@app.get("/sales/{sale_id}/receipt", response_model=dict, tags=["Sales", "Receipts"])
+async def generate_receipt_data(sale_id: int, db: Session = Depends(get_db)):
+    """
+    Generates the data structure for a sales receipt, including detailed financial info.
+    """
     sale = db.query(Sales)\
         .options(
-            joinedload(Sales.sale_items).joinedload(SaleItem.item), # Load items within sale_items
-            joinedload(Sales.payments) # Assuming payments relationship exists (check models.py)
+            joinedload(Sales.sale_items).joinedload(SaleItem.item),
+            joinedload(Sales.payments), # Uses SplitPayment relationship name ('payments')
+            joinedload(Sales.staff),
+            joinedload(Sales.customer)
         )\
         .filter(Sales.sale_id == sale_id).first()
 
     if not sale:
-        raise HTTPException(status_code=404, detail="Sales record not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sales record not found")
 
     items_detail = []
-    calculated_total = 0.0
-    total_tax = 0.0
-    total_discount = 0.0
+    calculated_line_item_subtotal = 0.0
+    total_tax_on_items = 0.0
+    total_discount_on_items = 0.0
 
     for si in sale.sale_items:
-        subtotal = si.quantity * float(si.unit_price)
-        tax_amount = float(si.tax)
-        discount_amount = float(si.discount)
-        item_total = subtotal - discount_amount + tax_amount
+        if not si.item:
+             print(f"Warning: SaleItem {si.sale_item_id} in Sale {sale_id} has no associated Item.")
+             continue
 
-        calculated_total += item_total
-        total_tax += tax_amount
-        total_discount += discount_amount
+        # Ensure values are floats for calculation
+        item_quantity = float(si.quantity or 0)
+        item_unit_price = float(si.unit_price or 0.0)
+        item_discount = float(si.discount or 0.0)
+        item_tax = float(si.tax or 0.0)
+
+        line_subtotal = item_quantity * item_unit_price
+        calculated_line_item_subtotal += line_subtotal
+
+        total_discount_on_items += item_discount
+        total_tax_on_items += item_tax
+
+        # Line total reflects price *after* item-specific adjustments
+        line_total_after_mods = line_subtotal - item_discount + item_tax
 
         items_detail.append({
-            "item_name": si.item.item_name if si.item else "Unknown Item",
-            "quantity": si.quantity,
-            "unit_price": float(si.unit_price),
-            "discount": discount_amount,
-            "tax": tax_amount,
-            "subtotal": item_total # Line item total after tax/discount
+            "item_name": si.item.item_name,
+            "quantity": si.quantity, # Keep original quantity for display
+            "unit_price": item_unit_price,
+            "line_total": line_total_after_mods
         })
 
-    # Calculate total paid from SplitPayments
-    total_paid = sum(float(p.amount) for p in sale.payments) # Assuming 'payments' is the relationship name for SplitPayment
+    # Total Paid: Sum from SplitPayment records
+    total_paid = sum(float(p.amount or 0.0) for p in sale.payments)
 
-    # Use calculated total if sale.total_amount seems off, or preferably rely on sale.total_amount
-    final_total = float(sale.total_amount) # Trust the stored total amount
-    balance = total_paid - final_total
+    # Final Total Charged: Use the value stored in the Sales record
+    final_total_charged = float(sale.total_amount or 0.0)
 
-    receipt = {
+    # Calculate Balance/Change
+    balance = total_paid - final_total_charged
+
+    # Determine Subtotal, Tax, Discount for Display:
+    # These values are derived for display purposes.
+    display_discount = total_discount_on_items
+    display_tax = total_tax_on_items
+    # Calculate effective subtotal (amount before these taxes/discounts)
+    display_subtotal = final_total_charged + display_discount - display_tax
+
+    # Optional Sanity Check (for debugging)
+    if abs(final_total_charged - (calculated_line_item_subtotal - total_discount_on_items + total_tax_on_items)) > 0.02: # Increased tolerance slightly
+        print(f"Receipt Data Warning (Sale ID: {sale_id}): Final total ({final_total_charged:.2f}) "
+              f"differs from sum of parts (Subtotal:{calculated_line_item_subtotal:.2f} "
+              f"- Discount:{total_discount_on_items:.2f} + Tax:{total_tax_on_items:.2f} = "
+              f"{(calculated_line_item_subtotal - total_discount_on_items + total_tax_on_items):.2f})")
+
+    receipt_data = {
         "sale_id": sale.sale_id,
-        "receipt_number": sale.receipt_number,
+        "receipt_number": sale.receipt_number or f"SALE-{sale.sale_id}",
         "checkout_time": sale.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-        "total_amount": final_total,
-        "total_tax": total_tax,
-        "total_discount": total_discount,
-        "total_paid": total_paid, # Use sum from split payments
-        "balance": balance,
+        "subtotal_display": display_subtotal,
+        "total_discount_display": display_discount,
+        "total_tax_display": display_tax,
+        "total_amount": final_total_charged,    # Final amount charged
+        "total_paid": total_paid,               # Total money received
+        "balance": balance,                     # Change or amount due
         "payment_status": sale.payment_status.value if sale.payment_status else 'unknown',
         "items": items_detail,
-        # Optionally add Staff Name, Customer Name
-        # "staff_name": sale.staff.full_name if sale.staff else "N/A",
-        # "customer_name": sale.customer.full_name if sale.customer else "N/A"
+        "staff_name": sale.staff.full_name if sale.staff else "N/A",
+        "customer_name": sale.customer.full_name if sale.customer else "Walk-in"
     }
-    return receipt
+    return receipt_data
 
-@app.get("/sales/{sale_id}/receipt/pdf")
-def get_receipt_pdf(sale_id: int, db: Session = Depends(get_db)):
-    # Use the data generated by the JSON endpoint
-    receipt_data = generate_receipt(sale_id, db)
 
-    # Build table rows
+@app.get("/sales/{sale_id}/receipt/pdf", tags=["Sales", "Receipts"])
+async def get_receipt_pdf(sale_id: int, db: Session = Depends(get_db)):
+    """
+    Generates a sales receipt PDF, formatted specifically for a 58mm thermal printer,
+    including detailed financial information.
+    """
+    try:
+        # Get the structured receipt data
+        receipt_data = await generate_receipt_data(sale_id, db)
+    except HTTPException as e:
+        raise e # Propagate client errors (e.g., 404)
+    except Exception as e:
+        # Log unexpected errors during data generation
+        print(f"ERROR: Failed to generate receipt data for PDF (Sale ID: {sale_id}): {e}")
+        import traceback
+        traceback.print_exc() # Print full traceback for debugging
+        raise HTTPException(status_code=500, detail=f"Could not generate receipt data: {e}")
+
+    # Build HTML table rows for items
     rows = ""
-    for item in receipt_data["items"]:
+    for item in receipt_data.get("items", []):
+        # Basic HTML escaping for item name
+        item_name = item.get('item_name', 'N/A')
+        item_name_escaped = item_name.replace('&', '&').replace('<', '<').replace('>', '>')
         rows += f"""
               <tr>
-                <td>{item['item_name']}</td>
-                <td style="text-align: center;">{item['quantity']}</td>
-                <td style="text-align: right;">Rs {item['unit_price']:.2f}</td>
-                <td style="text-align: right;">Rs {item['subtotal']:.2f}</td>
+                <td>{item_name_escaped}</td>
+                <td>{item.get('quantity', 0)}</td>
+                <td>{item.get('unit_price', 0.0):.2f}</td>
+                <td>{item.get('line_total', 0.0):.2f}</td>
               </tr>
         """
 
-    html_content = f"""
-    <html>
-      <head>
-        <meta charset="utf-8">
-        <title>Receipt #{receipt_data['receipt_number'] or receipt_data['sale_id']}</title>
-        <style>
-          body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 10px; margin: 0; padding: 0; color: #333; }}
-          .receipt {{ max-width: 300px; margin: auto; padding: 15px; border: 1px solid #eee; }}
-          .header {{ text-align: center; margin-bottom: 15px; }}
-          .header h1 {{ font-size: 16px; margin-bottom: 2px; font-weight: 600; }}
-          .header p {{ margin: 2px 0; font-size: 9px; color: #555; }}
-          table {{ width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 10px; }}
-          th, td {{ padding: 4px 2px; border-bottom: 1px dotted #ccc; text-align: left; vertical-align: top; }}
-          th {{ font-size: 10px; font-weight: 600; border-bottom: 1px solid #555;}}
-          .summary {{ margin-top: 15px; font-size: 10px; border-top: 1px solid #555; padding-top: 8px;}}
-          .summary p {{ margin: 4px 0; display: flex; justify-content: space-between; }}
-          .summary p span:first-child {{ font-weight: 500; }}
-          .summary .total {{ font-weight: bold; font-size: 11px; }}
-          .footer {{ text-align: center; margin-top: 15px; font-size: 9px; color: #777; border-top: 1px dotted #ccc; padding-top: 8px;}}
-        </style>
-      </head>
-      <body>
-        <div class="receipt">
-          <div class="header">
-            <h1>My POS System</h1>
-            <p>123 Store Street, City, ST 12345</p>
-            <p>Phone: (123) 456-7890</p>
-            <hr style="border: none; border-top: 1px dotted #ccc; margin: 5px 0;">
-            <p>Sale ID: {receipt_data['sale_id']}</p>
-            <p>Receipt #: {receipt_data['receipt_number'] or 'N/A'}</p>
-            <p>Date: {receipt_data['checkout_time']}</p>
-             <!-- <p>Cashier: {receipt_data.get('staff_name', 'N/A')}</p> -->
-             <!-- <p>Customer: {receipt_data.get('customer_name', 'Walk-in')}</p> -->
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th style="text-align: center;">Qty</th>
-                <th style="text-align: right;">Price</th>
-                <th style="text-align: right;">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows}
-            </tbody>
-          </table>
-          <div class="summary">
-            <p><span>Subtotal:</span> <span>Rs {(receipt_data['total_amount'] + receipt_data['total_discount'] - receipt_data['total_tax']):.2f}</span></p>
-            <p><span>Discounts:</span> <span>- Rs {receipt_data['total_discount']:.2f}</span></p>
-            <p><span>Tax:</span> <span>+ Rs {receipt_data['total_tax']:.2f}</span></p>
-            <p class="total"><span>Total Amount:</span> <span>Rs {receipt_data['total_amount']:.2f}</span></p>
-            <hr style="border: none; border-top: 1px dotted #ccc; margin: 5px 0;">
-            <p><span>Total Paid:</span> <span>Rs {receipt_data['total_paid']:.2f}</span></p>
-            <p><span>Balance/Change:</span> <span>Rs {receipt_data['balance']:.2f}</span></p>
-            <p><span>Payment Status:</span> <span>{receipt_data['payment_status'].upper()}</span></p>
-             <!-- Add payment method details if needed -->
-          </div>
-          <div class="footer">
-            <p>Thank you for your purchase!</p>
-            <p>Visit again!</p>
-             <!-- Add barcode/QR code area if needed -->
-          </div>
+    # --- Use the Provided 58mm Thermal Printer HTML Structure ---
+    # Using f-strings for interpolation. Using .get() with defaults for safety.
+    html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Receipt #{receipt_data.get('receipt_number', sale_id)}</title>
+    <style>
+      /* Styles optimized for 58mm thermal printer */
+      @page {{ size: 58mm auto; margin: 0; }}
+      body {{ margin: 0; padding: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 9px; color: #000; /* Black for better contrast */ background: #fff; }}
+      .receipt {{ width: 58mm; margin: 0; padding: 4px; box-sizing: border-box; }}
+      .header {{ text-align: center; margin-bottom: 5px; }}
+      .header h1 {{ font-size: 11px; margin: 0 0 2px 0; font-weight: bold; }} /* Slightly bolder */
+      .header p {{ margin: 1px 0; font-size: 8px; color: #333; line-height: 1.1; }}
+      hr {{ border: none; border-top: 1px dashed #666; margin: 3px 0; }}
+      .info p {{ margin: 1px 0; font-size: 8px; text-align: left;}} /* Info below header */
+      table {{ width: 100%; border-collapse: collapse; margin: 3px 0; }}
+      th, td {{ padding: 1.5px 1px; /* Tighter padding */ text-align: left; vertical-align: top; border: none; /* Remove internal borders */ font-size: 8px; word-break: break-all; }}
+      thead tr {{ border-top: 1px solid #000; border-bottom: 1px solid #000; }} /* Top/bottom border for header */
+      th {{ font-weight: bold; }}
+      tbody tr td {{ border-bottom: 1px dotted #ccc; }} /* Dotted separator for items */
+      tbody tr:last-child td {{ border-bottom: none; }} /* No border on last item */
+      /* Align columns */
+      th:nth-child(1), td:nth-child(1) {{ width: 48%; padding-right: 2px; }} /* Item name width */
+      th:nth-child(2), td:nth-child(2) {{ text-align: center; width: 10%; }} /* Qty */
+      th:nth-child(3), td:nth-child(3) {{ text-align: right; width: 20%; padding-right: 2px;}} /* Price */
+      th:nth-child(4), td:nth-child(4) {{ text-align: right; width: 22%; }} /* Line Total */
+      .summary {{ margin-top: 5px; font-size: 8px; border-top: 1px solid #000; padding-top: 3px; }}
+      .summary p {{ margin: 2px 0; display: flex; justify-content: space-between; }}
+      .summary p span:first-child {{ font-weight: normal; padding-right: 5px; }} /* Labels not bold */
+      .summary p span:last-child {{ font-weight: bold; }} /* Values bold */
+      .summary .total {{ font-weight: bold; font-size: 10px; }} /* Total slightly larger */
+      .payment-info {{ border-top: 1px dashed #666; padding-top: 3px; margin-top: 3px; }}
+      .footer {{ text-align: center; margin-top: 5px; font-size: 8px; color: #333; border-top: 1px dashed #666; padding-top: 3px; }}
+    </style>
+</head>
+<body>
+    <div class="receipt">
+      <!-- Header -->
+      <div class="header">
+        <h1>YOUR STORE NAME</h1> <!-- *** REPLACE *** -->
+        <p>123 Your Street, Your City</p> <!-- *** REPLACE *** -->
+        <p>Phone: 012-345-6789</p> <!-- *** REPLACE *** -->
+        <!-- <p>VAT Reg: 123456789</p> --> <!-- Optional -->
+      </div>
+
+      <!-- Sale Info -->
+      <div class="info">
+          <hr>
+          <p>Sale ID: {receipt_data['sale_id']}</p>
+          <p>Receipt: {receipt_data.get('receipt_number', 'N/A')}</p>
+          <p>Date: {receipt_data['checkout_time']}</p>
+          <p>Cashier: {receipt_data.get('staff_name', 'N/A')}</p>
+          <p>Customer: {receipt_data.get('customer_name', 'Walk-in')}</p>
+      </div>
+
+      <!-- Items Table -->
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Qty</th>
+            <th>Price</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows}
+        </tbody>
+      </table>
+
+      <!-- Summary -->
+      <div class="summary">
+        <p>
+          <span>Subtotal:</span>
+          <span>Rs {receipt_data.get('subtotal_display', 0.0):.2f}</span>
+        </p>
+        {f"<p><span>Discounts:</span><span>- Rs {receipt_data['total_discount_display']:.2f}</span></p>" if receipt_data.get('total_discount_display', 0.0) > 0 else ""}
+        {f"<p><span>Tax:</span><span>+ Rs {receipt_data['total_tax_display']:.2f}</span></p>" if receipt_data.get('total_tax_display', 0.0) > 0 else ""}
+
+        <p class="total">
+          <span>TOTAL:</span>
+          <span>Rs {receipt_data.get('total_amount', 0.0):.2f}</span>
+        </p>
+
+        <div class="payment-info">
+             <p>
+               <span>PAID:</span>
+               <span>Rs {receipt_data.get('total_paid', 0.0):.2f}</span>
+             </p>
+             <p>
+               <span>BALANCE:</span>
+               <span>Rs {receipt_data.get('balance', 0.0):.2f}</span>
+             </p>
+             <p>
+               <span>Status:</span>
+               <span>{receipt_data.get('payment_status', 'UNKNOWN').upper()}</span>
+             </p>
+             <!-- Optional: Add payment method details if needed and available -->
+             <!-- <p><span>Method:</span><span>CASH/CARD</span></p> -->
         </div>
-      </body>
-    </html>
-    """
-    pdf_bytes = HTML(string=html_content).write_pdf()
-    return StreamingResponse(io.BytesIO(pdf_bytes),
-                             media_type="application/pdf",
-                             headers={"Content-Disposition": f"inline; filename=receipt_{sale_id}.pdf"}) # Use inline to display in browser
+      </div>
+
+      <!-- Footer -->
+      <div class="footer">
+        <p>Thank you for your purchase!</p>
+        <p>Please visit again!</p>
+        <!-- <p>www.yourstore.com</p> --> <!-- Optional -->
+      </div>
+    </div>
+</body>
+</html>
+"""
+
+    # --- Generate PDF using WeasyPrint ---
+    try:
+        pdf_bytes = HTML(string=html_content).write_pdf()
+        return StreamingResponse(io.BytesIO(pdf_bytes),
+                                 media_type="application/pdf",
+                                 headers={"Content-Disposition": f"inline; filename=receipt_{sale_id}.pdf"})
+    except Exception as pdf_error:
+         # Log the specific error during PDF generation
+         print(f"ERROR: Failed to generate PDF with WeasyPrint (Sale ID: {sale_id}): {pdf_error}")
+         import traceback
+         traceback.print_exc() # Print full traceback for debugging
+         raise HTTPException(status_code=500, detail=f"Could not generate PDF receipt: {pdf_error}")
 
 # ================================
 # Sales Report PDF Endpoint

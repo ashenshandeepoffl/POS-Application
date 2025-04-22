@@ -1,15 +1,18 @@
 # schemas.py
 
-from pydantic import BaseModel, EmailStr, validator
+from pydantic import BaseModel, EmailStr, validator, Field
 from typing import Optional, List
 from enum import Enum
 from datetime import date, time, datetime
-import enum # Keep this import
+import enum as py_enum # Alias standard enum to avoid confusion
 
 # ---------------------------
-# Enumerations
+# Enumerations (Matching models.py, using str for FastAPI)
 # ---------------------------
-# (Keep existing Enums: StaffRoleEnum, StaffStatusEnum, StoreStatusEnum, CategoryStatusEnum, PaymentStatusEnum, RefundStatusEnum, TaxStatusEnum)
+class CategoryStatusEnum(str, Enum):
+    active = "active"
+    inactive = "inactive"
+
 class StaffRoleEnum(str, Enum):
     Admin = "Admin"
     Manager = "Manager"
@@ -23,26 +26,22 @@ class StoreStatusEnum(str, Enum):
     active = "active"
     inactive = "inactive"
 
-class CategoryStatusEnum(str, Enum):
-    active = "active"
-    inactive = "inactive"
-
 class PaymentStatusEnum(str, Enum):
     pending = "pending"
     paid = "paid"
     cancelled = "cancelled"
-    # Consider adding: partially_paid, refunded, partially_refunded
+    partially_paid = "partially_paid"
 
 class RefundStatusEnum(str, Enum):
     none = "none"
     pending = "pending"
     processed = "processed"
 
-class TaxStatusEnum(str, Enum):
-    active = "active"
-    inactive = "inactive"
+class AttendanceStatus(str, Enum):
+    present = "present"
+    absent = "absent"
+    leave = "leave"
 
-# Consider adding enums for DiscountType, DiscountStatus, AttendanceStatus, PO Status, Stock History Change Type if not already defined elsewhere or if you want stricter typing here.
 class DiscountTypeEnum(str, Enum):
     fixed_amount = "fixed_amount"
     percentage = "percentage"
@@ -50,25 +49,40 @@ class DiscountTypeEnum(str, Enum):
 class DiscountStatusEnum(str, Enum):
     active = "active"
     expired = "expired"
-    inactive = "inactive" # Added inactive
+    inactive = "inactive"
 
-class ChangeTypeEnum(str, Enum):
+class TaxStatusEnum(str, Enum):
+    active = "active"
+    inactive = "inactive"
+
+class StockChangeTypeEnum(str, Enum):
     addition = "addition"
     removal = "removal"
     adjustment = "adjustment"
+    initial = "initial"
 
 class POStatusEnum(str, Enum):
     pending = "pending"
     shipped = "shipped"
     received = "received"
     cancelled = "cancelled"
+    partially_received = "partially_received"
 
+# ---------------------------
+# Utility Validator
+# ---------------------------
+# Decorator to convert Python Enums to their string values in responses
+enum_validator = validator('*', pre=True, allow_reuse=True)
+def convert_enum_to_string(cls, v):
+    if isinstance(v, py_enum.Enum):
+        return v.value
+    return v
 
 # ---------------------------
 # Role Schemas
 # ---------------------------
 class RoleBase(BaseModel):
-    role_name: str
+    role_name: str = Field(..., max_length=50)
 
 class RoleCreate(RoleBase):
     pass
@@ -77,14 +91,13 @@ class RoleResponse(RoleBase):
     role_id: int
 
     class Config:
-        orm_mode = True
-
+        from_attributes = True
 
 # ---------------------------
 # Permission Schemas
 # ---------------------------
 class PermissionBase(BaseModel):
-    permission_name: str
+    permission_name: str = Field(..., max_length=100)
 
 class PermissionCreate(PermissionBase):
     pass
@@ -93,7 +106,7 @@ class PermissionResponse(PermissionBase):
     permission_id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # ---------------------------
 # RolePermission Schemas
@@ -109,7 +122,7 @@ class RolePermissionResponse(RolePermissionBase):
     role_permission_id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # ---------------------------
 # UserRole Schemas
@@ -125,15 +138,15 @@ class UserRoleResponse(UserRoleBase):
     user_role_id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # ------------------------------
 # Category Schemas
 # ------------------------------
 class CategoryBase(BaseModel):
-    category_name: str
+    category_name: str = Field(..., max_length=100)
     description: Optional[str] = None
-    status: Optional[CategoryStatusEnum] = CategoryStatusEnum.active
+    status: CategoryStatusEnum = CategoryStatusEnum.active
 
 class CategoryCreate(CategoryBase):
     pass
@@ -143,26 +156,23 @@ class CategoryResponse(CategoryBase):
     created_at: datetime
     updated_at: datetime
 
-    @validator("status", pre=True, always=True)
-    def convert_category_status(cls, v):
-        if isinstance(v, enum.Enum):
-            return v.value
-        return v
+    # Validator to convert Enums for response
+    _enum_converter = enum_validator(convert_enum_to_string)
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # ---------------------------
 # Item Schemas
 # ---------------------------
 class ItemBase(BaseModel):
-    item_name: str
-    category_id: Optional[int] = None # Make required? Or handle null in backend
-    price: Optional[float] = None # Allow null, handle in backend if required
-    cost_price: Optional[float] = 0.00
-    barcode: Optional[str] = None
+    item_name: str = Field(..., max_length=150)
+    category_id: Optional[int] = None
+    price: Optional[float] = Field(None, ge=0) # Price >= 0
+    cost_price: Optional[float] = Field(0.00, ge=0) # Cost >= 0
+    barcode: Optional[str] = Field(None, max_length=50)
     is_perishable: Optional[bool] = False
-    image_url: Optional[str] = None
+    image_url: Optional[str] = Field(None, max_length=255)
 
 class ItemCreate(ItemBase):
     pass
@@ -171,25 +181,30 @@ class ItemResponse(ItemBase):
     item_id: int
     created_at: datetime
     updated_at: datetime
-    # Optionally include category name
-    # category_name: Optional[str] = None # Populate this in the endpoint if needed
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
+# Response schema for the GET /items/ endpoint including stock
+class ItemWithStockResponse(ItemResponse):
+    quantity: Optional[int] = None
+    min_stock_level: Optional[int] = None # Added min_stock_level
+
+    class Config:
+        from_attributes = True
 
 # ---------------------------
 # Customer Schemas
 # ---------------------------
 class CustomerBase(BaseModel):
-    full_name: str
-    email: Optional[EmailStr] = None
-    phone_number: Optional[str] = None
-    street: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    zip_code: Optional[str] = None
-    loyalty_points: Optional[int] = 0
+    full_name: str = Field(..., max_length=100)
+    email: Optional[EmailStr] = Field(None, max_length=100)
+    phone_number: Optional[str] = Field(None, max_length=20)
+    street: Optional[str] = Field(None, max_length=255)
+    city: Optional[str] = Field(None, max_length=100)
+    state: Optional[str] = Field(None, max_length=100)
+    zip_code: Optional[str] = Field(None, max_length=20)
+    loyalty_points: Optional[int] = Field(0, ge=0) # Points >= 0
 
 class CustomerCreate(CustomerBase):
     pass
@@ -200,81 +215,72 @@ class CustomerResponse(CustomerBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True
-
+        from_attributes = True
 
 # ---------------------------
 # Staff Schemas
 # ---------------------------
 class StaffBase(BaseModel):
-    full_name: str
-    email: EmailStr
+    full_name: str = Field(..., max_length=100)
+    email: EmailStr = Field(..., max_length=100)
     role: StaffRoleEnum = StaffRoleEnum.Employee
     is_manager: Optional[bool] = False
-    phone_number: Optional[str] = None
+    phone_number: Optional[str] = Field(None, max_length=20)
     date_of_birth: Optional[date] = None
-    salary: Optional[float] = 0.00
+    salary: Optional[float] = Field(0.00, ge=0) # Salary >= 0
     shift_start_time: Optional[time] = None
     shift_end_time: Optional[time] = None
-    street: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    zip_code: Optional[str] = None
+    street: Optional[str] = Field(None, max_length=255)
+    city: Optional[str] = Field(None, max_length=100)
+    state: Optional[str] = Field(None, max_length=100)
+    zip_code: Optional[str] = Field(None, max_length=20)
     additional_details: Optional[str] = None
-    status: Optional[StaffStatusEnum] = StaffStatusEnum.active # Added status here
+    status: StaffStatusEnum = StaffStatusEnum.active
 
 class StaffCreate(StaffBase):
-    password: str # Plaintext password for creation
+    password: str # Required on creation
 
-class StaffUpdate(StaffBase): # Inherit from StaffBase which has most fields
-    email: Optional[EmailStr] = None # Make email optional too for partial updates
-    full_name: Optional[str] = None # Make others optional if you want partial updates
+class StaffUpdate(BaseModel): # Separate schema for update, all fields optional
+    full_name: Optional[str] = Field(None, max_length=100)
+    email: Optional[EmailStr] = Field(None, max_length=100)
     role: Optional[StaffRoleEnum] = None
     is_manager: Optional[bool] = None
-    phone_number: Optional[str] = None
+    phone_number: Optional[str] = Field(None, max_length=20)
     date_of_birth: Optional[date] = None
-    salary: Optional[float] = None
+    salary: Optional[float] = Field(None, ge=0)
     shift_start_time: Optional[time] = None
     shift_end_time: Optional[time] = None
-    street: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    zip_code: Optional[str] = None
+    street: Optional[str] = Field(None, max_length=255)
+    city: Optional[str] = Field(None, max_length=100)
+    state: Optional[str] = Field(None, max_length=100)
+    zip_code: Optional[str] = Field(None, max_length=20)
     additional_details: Optional[str] = None
-    status: Optional[StaffStatusEnum] = None # Allow updating status
-
-    password: Optional[str] = None # <<< Password is now optional
-
-    class Config:
-        orm_mode = True
+    status: Optional[StaffStatusEnum] = None
+    password: Optional[str] = None # Optional on update
 
 class StaffResponse(StaffBase):
     staff_id: int
-    # status: StaffStatusEnum # Already included in StaffBase now
     created_at: datetime
     updated_at: datetime
+    # Note: password_hash is deliberately excluded from response
 
-    @validator("role", "status", pre=True, always=True)
-    def convert_enums(cls, v):
-        if isinstance(v, enum.Enum):
-            return v.value
-        return v
+    # Validator to convert Enums for response
+    _enum_converter = enum_validator(convert_enum_to_string)
 
     class Config:
-        orm_mode = True
-
+        from_attributes = True
 
 # ---------------------------
 # Store Schemas
 # ---------------------------
 class StoreBase(BaseModel):
-    store_name: str
-    street: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    zip_code: Optional[str] = None
-    contact_number: Optional[str] = None
-    status: Optional[StoreStatusEnum] = StoreStatusEnum.active # Added status here
+    store_name: str = Field(..., max_length=100)
+    street: Optional[str] = Field(None, max_length=255)
+    city: Optional[str] = Field(None, max_length=100)
+    state: Optional[str] = Field(None, max_length=100)
+    zip_code: Optional[str] = Field(None, max_length=20)
+    contact_number: Optional[str] = Field(None, max_length=20)
+    status: StoreStatusEnum = StoreStatusEnum.active
 
 class StoreCreate(StoreBase):
     manager_id: Optional[int] = None
@@ -284,17 +290,12 @@ class StoreResponse(StoreBase):
     manager_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
-    # manager_name: Optional[str] = None # Populate in endpoint if needed
 
-    @validator("status", pre=True, always=True)
-    def convert_store_status(cls, v):
-        if isinstance(v, enum.Enum):
-            return v.value
-        return v
+    # Validator to convert Enums for response
+    _enum_converter = enum_validator(convert_enum_to_string)
 
     class Config:
-        orm_mode = True
-
+        from_attributes = True
 
 # ---------------------------
 # Stock Schemas
@@ -302,12 +303,12 @@ class StoreResponse(StoreBase):
 class StockBase(BaseModel):
     store_id: int
     item_id: int
-    quantity: Optional[int] = 0
-    cost: Optional[float] = 0.00 # Maybe rename to average_cost_price?
-    min_stock_level: Optional[int] = 5
-    location: Optional[str] = None
-    measurement_unit: Optional[str] = None
-    batch_number: Optional[str] = None
+    quantity: int = Field(0, ge=0) # Quantity cannot be negative
+    cost: Optional[float] = Field(0.00, ge=0)
+    min_stock_level: int = Field(5, ge=0)
+    location: Optional[str] = Field(None, max_length=255)
+    measurement_unit: Optional[str] = Field(None, max_length=50)
+    batch_number: Optional[str] = Field(None, max_length=50)
     manufacture_date: Optional[date] = None
     expiry_date: Optional[date] = None
 
@@ -317,101 +318,80 @@ class StockCreate(StockBase):
 class StockResponse(StockBase):
     stock_id: int
     last_updated: datetime
-    # item_name: Optional[str] = None # Populate in endpoint
-    # store_name: Optional[str] = None # Populate in endpoint
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # ---------------------------
 # Sales Schemas
 # ---------------------------
 class SalesBase(BaseModel):
+    # Fields typically required when *creating* a sale context initially
     staff_id: int
     store_id: int
     customer_id: Optional[int] = None
-    # Fields calculated during process_sale, optional here
-    total_amount: Optional[float] = None
-    payment_status: Optional[PaymentStatusEnum] = None
-    receipt_number: Optional[str] = None
-    refund_amount: Optional[float] = 0.00
-    refund_status: Optional[RefundStatusEnum] = RefundStatusEnum.none
-    # Add fields if you want them settable during creation explicitly
-    # cash_received: Optional[float] = None # Example
 
 class SalesCreate(SalesBase):
-    # Used primarily by process_sale endpoint now
+    # Inherits fields from SalesBase, used in ProcessSalePayload
     pass
 
-class SalesResponse(SalesBase):
+class SalesUpdate(BaseModel): # For updating existing sales
+    payment_status: Optional[PaymentStatusEnum] = None
+    receipt_number: Optional[str] = Field(None, max_length=50)
+    refund_amount: Optional[float] = Field(None, ge=0)
+    refund_status: Optional[RefundStatusEnum] = None
+    # Add other updatable fields if needed (e.g., customer_id)
+    customer_id: Optional[int] = None
+
+class SalesResponse(SalesBase): # Shows state after creation/retrieval
     sale_id: int
-    sale_date: datetime # This is set by server_default=func.now() on creation
+    sale_date: datetime
+    total_amount: float = Field(0.00) # Should reflect final calculated amount
+    payment_status: PaymentStatusEnum = PaymentStatusEnum.pending
+    receipt_number: Optional[str] = None
+    refund_amount: Optional[float] = Field(0.00)
+    refund_status: Optional[RefundStatusEnum] = RefundStatusEnum.none
     created_at: datetime
     updated_at: datetime
-    # Explicitly define the fields calculated/set by the backend
-    total_amount: Optional[float] = 0.00 # Override base
-    payment_status: Optional[PaymentStatusEnum] = PaymentStatusEnum.pending # Override base
+    # Optional related data (populate in endpoint if needed, ensure corresponding schemas exist)
+    # sale_items: List['SaleItemResponse'] = []
+    # payments: List['SplitPaymentResponse'] = []
 
-    # Optional related data (populate in endpoint if needed)
-    # sale_items: Optional[List['SaleItemResponse']] = []
-    # payments: Optional[List['SplitPaymentResponse']] = [] # Use SplitPaymentResponse
-    # staff_name: Optional[str] = None
-    # customer_name: Optional[str] = None
-    # store_name: Optional[str] = None
-
-    @validator("payment_status", "refund_status", pre=True, always=True)
-    def convert_sale_enums(cls, v):
-        if isinstance(v, enum.Enum):
-            return v.value
-        return v
+    # Validator to convert Enums for response
+    _enum_converter = enum_validator(convert_enum_to_string)
 
     class Config:
-        orm_mode = True
-
-class SalesUpdate(BaseModel): # Schema for updating existing sales (e.g., status, refund)
-    payment_status: Optional[PaymentStatusEnum] = None
-    receipt_number: Optional[str] = None
-    refund_amount: Optional[float] = None
-    refund_status: Optional[RefundStatusEnum] = None
-    # Add other fields if update is allowed, e.g., customer_id
-
-    class Config:
-        orm_mode = True
-
+        from_attributes = True
 
 # ---------------------------
 # SaleItem Schemas
 # ---------------------------
-class SaleItemBase(BaseModel):
+class SaleItemBase(BaseModel): # Used in ProcessSalePayload
     item_id: int
-    quantity: int = 1
-    unit_price: Optional[float] = None # Price can come from Item or be overridden
-    discount: Optional[float] = 0.00
-    tax: Optional[float] = 0.00
+    quantity: int = Field(..., gt=0) # Quantity must be at least 1
+    unit_price: Optional[float] = Field(None, ge=0) # Price must be non-negative
+    discount: Optional[float] = Field(0.00, ge=0)
+    tax: Optional[float] = Field(0.00, ge=0)
 
-class SaleItemCreate(SaleItemBase):
-    sale_id: int  # <<< --- ADD THIS LINE ---
-    # Used within process_sale payload and when calling POST /sale_items/ directly
-    pass
+class SaleItemCreate(SaleItemBase): # Used for direct POST /sale_items/
+    sale_id: int # Required when creating individually
 
 class SaleItemResponse(SaleItemBase):
     sale_item_id: int
-    sale_id: int # Also ensure sale_id is in the response schema
-    unit_price: float # Make non-optional in response
-    subtotal: float # The computed value from the model
-
-    # Optionally include item name
-    # item_name: Optional[str] = None
+    sale_id: int
+    unit_price: float # Should be non-optional in response
+    subtotal: Optional[float] = None # Add if needed, or rely on calculation
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # ---------------------------
 # PaymentMethod Schemas
 # ---------------------------
 class PaymentMethodBase(BaseModel):
-    payment_method_name: str
-    is_active: Optional[bool] = True # Added active flag
+    payment_method_name: str = Field(..., max_length=100)
+    # Consider adding is_active if needed
+    # is_active: bool = True
 
 class PaymentMethodCreate(PaymentMethodBase):
     pass
@@ -420,50 +400,46 @@ class PaymentMethodResponse(PaymentMethodBase):
     payment_method_id: int
 
     class Config:
-        orm_mode = True
-
+        from_attributes = True
 
 # ---------------------------
-# SplitPayment Schemas (Used for recording actual payment parts)
+# SplitPayment Schemas
 # ---------------------------
 class SplitPaymentBase(BaseModel):
-    # sale_id is context, amount/method required
-    amount: float
+    amount: float = Field(..., gt=0) # Amount must be positive
     payment_method_id: int
-    transaction_reference: Optional[str] = None
+    transaction_reference: Optional[str] = Field(None, max_length=255)
 
 class SplitPaymentCreate(SplitPaymentBase):
-    # Used when adding payment after initial sale, requires sale_id
-    sale_id: int
+    sale_id: int # Required when creating individually
 
 class SplitPaymentResponse(SplitPaymentBase):
     split_payment_id: int
-    sale_id: int # Include sale_id in response
+    sale_id: int
     payment_date: datetime
-    # payment_method_name: Optional[str] = None # Populate in endpoint
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
-# Note: The old Payment schema might be deprecated if SplitPayment handles everything
-# If kept, it should be clarified what it represents (e.g., maybe a summary?)
-class PaymentBase(BaseModel): # Legacy or Summary?
-    sale_id: int
-    amount: float
-    payment_method_id: int # Or maybe just payment_method_name?
-    transaction_reference: Optional[str] = None
+# ---------------------------
+# Payment Schemas (Legacy/Direct - used in current ProcessSalePayload)
+# ---------------------------
+class PaymentBase(BaseModel):
+    # sale_id: Optional[int] = None # Not usually needed in payload list
+    amount: float = Field(..., gt=0)
+    payment_method_id: int
+    transaction_reference: Optional[str] = Field(None, max_length=255)
 
 class PaymentCreate(PaymentBase):
-     # Used for the list in process_sale endpoint (sale_id not needed there)
-     sale_id: Optional[int] = None # Made optional here
+    pass # No extra fields needed for creation payload
 
 class PaymentResponse(PaymentBase):
     payment_id: int
+    sale_id: int # Include sale_id in response
     payment_date: datetime
 
     class Config:
-        orm_mode = True
-
+        from_attributes = True
 
 # ---------------------------
 # Attendance Schemas
@@ -473,7 +449,7 @@ class AttendanceBase(BaseModel):
     store_id: int
     check_in: Optional[datetime] = None
     check_out: Optional[datetime] = None
-    status: Optional[str] = "present" # TODO: Use Enum? e.g., AttendanceStatusEnum
+    status: AttendanceStatus = AttendanceStatus.present
     remarks: Optional[str] = None
 
 class AttendanceCreate(AttendanceBase):
@@ -481,23 +457,23 @@ class AttendanceCreate(AttendanceBase):
 
 class AttendanceResponse(AttendanceBase):
     attendance_id: int
-    total_hours: Optional[float] = None # Computed
+    # total_hours: Optional[float] = None # Computed property might not map directly
     created_at: datetime
-    # staff_name: Optional[str] = None # Populate in endpoint
-    # store_name: Optional[str] = None # Populate in endpoint
+
+    # Validator to convert Enums for response
+    _enum_converter = enum_validator(convert_enum_to_string)
 
     class Config:
-        orm_mode = True
-
+        from_attributes = True
 
 # ---------------------------
-# SalesReport Schemas
+# SalesReport Schemas (Check if this table is actually used/populated)
 # ---------------------------
 class SalesReportBase(BaseModel):
     store_id: int
     report_date: date
-    total_sales: Optional[float] = 0.00
-    total_orders: Optional[int] = 0
+    total_sales: float = 0.00
+    total_orders: int = 0
     top_item_id: Optional[int] = None
 
 class SalesReportCreate(SalesReportBase):
@@ -506,41 +482,38 @@ class SalesReportCreate(SalesReportBase):
 class SalesReportResponse(SalesReportBase):
     report_id: int
     created_at: datetime
-    # top_item_name: Optional[str] = None # Populate in endpoint
-    # store_name: Optional[str] = None # Populate in endpoint
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # ---------------------------
-# SalesReportItem Schemas
+# SalesReportItem Schemas (Check if used)
 # ---------------------------
 class SalesReportItemBase(BaseModel):
     report_id: int
     item_id: int
-    quantity_sold: int
-    unit_price: float # Price at the time of sale for the report?
+    quantity_sold: int = Field(..., gt=0)
+    total_revenue: float = Field(..., ge=0) # Renamed from unit_price
 
 class SalesReportItemCreate(SalesReportItemBase):
     pass
 
 class SalesReportItemResponse(SalesReportItemBase):
     sales_report_item_id: int
-    # item_name: Optional[str] = None # Populate in endpoint
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # ---------------------------
 # Discount Schemas
 # ---------------------------
 class DiscountBase(BaseModel):
-    discount_name: str
-    discount_type: DiscountTypeEnum # Use Enum
-    discount_value: float
+    discount_name: str = Field(..., max_length=100)
+    discount_type: DiscountTypeEnum
+    discount_value: float = Field(..., ge=0) # Value must be non-negative
     start_date: Optional[date] = None
     end_date: Optional[date] = None
-    status: Optional[DiscountStatusEnum] = DiscountStatusEnum.active # Use Enum
+    status: DiscountStatusEnum = DiscountStatusEnum.active
 
 class DiscountCreate(DiscountBase):
     pass
@@ -548,23 +521,19 @@ class DiscountCreate(DiscountBase):
 class DiscountResponse(DiscountBase):
     discount_id: int
 
-    @validator("discount_type", "status", pre=True, always=True)
-    def convert_discount_enums(cls, v):
-        if isinstance(v, enum.Enum):
-            return v.value
-        return v
+    # Validator to convert Enums for response
+    _enum_converter = enum_validator(convert_enum_to_string)
 
     class Config:
-        orm_mode = True
-
+        from_attributes = True
 
 # ---------------------------
 # Tax Schemas
 # ---------------------------
 class TaxBase(BaseModel):
-    tax_name: str
-    tax_percentage: float
-    status: Optional[TaxStatusEnum] = TaxStatusEnum.active # Enum already defined
+    tax_name: str = Field(..., max_length=100)
+    tax_percentage: float = Field(..., ge=0) # Percentage >= 0
+    status: TaxStatusEnum = TaxStatusEnum.active
 
 class TaxCreate(TaxBase):
     pass
@@ -572,27 +541,22 @@ class TaxCreate(TaxBase):
 class TaxResponse(TaxBase):
     tax_id: int
 
-    @validator("status", pre=True, always=True)
-    def convert_tax_status(cls, v):
-        if isinstance(v, enum.Enum):
-            return v.value
-        return v
+    # Validator to convert Enums for response
+    _enum_converter = enum_validator(convert_enum_to_string)
 
     class Config:
-        orm_mode = True
-
+        from_attributes = True
 
 # ---------------------------
 # AuditLog Schemas
 # ---------------------------
 class AuditLogBase(BaseModel):
-    staff_id: Optional[int] = None # User who performed the action
-    action: str # e.g., CREATE, UPDATE, DELETE, LOGIN_SUCCESS, LOGIN_FAIL
-    table_name: Optional[str] = None # Table affected
-    record_id: Optional[int] = None # ID of the record affected
-    old_values: Optional[str] = None # JSON string?
-    new_values: Optional[str] = None # JSON string?
-    details: Optional[str] = None # Added general details field
+    staff_id: Optional[int] = None
+    action: str = Field(..., max_length=255)
+    table_name: Optional[str] = Field(None, max_length=100)
+    record_id: Optional[int] = None
+    old_values: Optional[str] = None # Consider Json type if needed
+    new_values: Optional[str] = None # Consider Json type if needed
 
 class AuditLogCreate(AuditLogBase):
     pass
@@ -600,20 +564,20 @@ class AuditLogCreate(AuditLogBase):
 class AuditLogResponse(AuditLogBase):
     log_id: int
     timestamp: datetime
-    # staff_name: Optional[str] = None # Populate in endpoint
 
     class Config:
-        orm_mode = True
-
+        from_attributes = True
 
 # ---------------------------
 # StockHistory Schemas
 # ---------------------------
 class StockHistoryBase(BaseModel):
     stock_id: int
-    quantity_change: int
-    change_type: ChangeTypeEnum # Use Enum
-    reason: Optional[str] = None # e.g., "Sale ID: 123", "PO Received: 45", "Manual Adjustment", "Stock Count Correction"
+    quantity_change: int # Can be positive or negative
+    change_type: StockChangeTypeEnum
+    reason: Optional[str] = None
+    related_sale_id: Optional[int] = None
+    related_po_id: Optional[int] = None
 
 class StockHistoryCreate(StockHistoryBase):
     pass
@@ -621,18 +585,12 @@ class StockHistoryCreate(StockHistoryBase):
 class StockHistoryResponse(StockHistoryBase):
     history_id: int
     change_date: datetime
-    # item_name: Optional[str] = None # Populate in endpoint
-    # store_name: Optional[str] = None # Populate in endpoint
 
-    @validator("change_type", pre=True, always=True)
-    def convert_change_type(cls, v):
-        if isinstance(v, enum.Enum):
-            return v.value
-        return v
+    # Validator to convert Enums for response
+    _enum_converter = enum_validator(convert_enum_to_string)
 
     class Config:
-        orm_mode = True
-
+        from_attributes = True
 
 # ---------------------------
 # DiscountsApplied Schemas
@@ -640,18 +598,16 @@ class StockHistoryResponse(StockHistoryBase):
 class DiscountsAppliedBase(BaseModel):
     sale_id: int
     discount_id: int
-    discount_amount: float
+    discount_amount: float = Field(..., ge=0)
 
 class DiscountsAppliedCreate(DiscountsAppliedBase):
     pass
 
 class DiscountsAppliedResponse(DiscountsAppliedBase):
     discount_applied_id: int
-    # discount_name: Optional[str] = None # Populate in endpoint
 
     class Config:
-        orm_mode = True
-
+        from_attributes = True
 
 # ---------------------------
 # TaxesApplied Schemas
@@ -659,26 +615,27 @@ class DiscountsAppliedResponse(DiscountsAppliedBase):
 class TaxesAppliedBase(BaseModel):
     sale_id: int
     tax_id: int
-    tax_amount: float
+    tax_amount: float = Field(..., ge=0)
 
 class TaxesAppliedCreate(TaxesAppliedBase):
     pass
 
 class TaxesAppliedResponse(TaxesAppliedBase):
     tax_applied_id: int
-    # tax_name: Optional[str] = None # Populate in endpoint
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # ---------------------------
 # Supplier Schemas
 # ---------------------------
 class SupplierBase(BaseModel):
-    supplier_name: str
-    contact_info: Optional[str] = None
+    supplier_name: str = Field(..., max_length=100)
+    contact_person: Optional[str] = Field(None, max_length=100)
+    contact_info: Optional[str] = Field(None, max_length=255)
     address: Optional[str] = None
-    is_active: Optional[bool] = True # Added active flag
+    # Consider adding is_active if needed
+    # is_active: bool = True
 
 class SupplierCreate(SupplierBase):
     pass
@@ -689,8 +646,7 @@ class SupplierResponse(SupplierBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True
-
+        from_attributes = True
 
 # ---------------------------
 # PurchaseOrder Schemas
@@ -698,59 +654,75 @@ class SupplierResponse(SupplierBase):
 class PurchaseOrderBase(BaseModel):
     supplier_id: int
     store_id: int
-    order_date: Optional[date] = None
+    order_date: Optional[date] = None # Can default in backend
     expected_delivery_date: Optional[date] = None
-    status: Optional[POStatusEnum] = POStatusEnum.pending # Use Enum
-    notes: Optional[str] = None # Added notes field
+    status: POStatusEnum = POStatusEnum.pending
+    notes: Optional[str] = None
+    # total_cost might be calculated, not part of base create
 
 class PurchaseOrderCreate(PurchaseOrderBase):
     pass
 
 class PurchaseOrderResponse(PurchaseOrderBase):
     purchase_order_id: int
+    total_cost: float = Field(0.00) # Include calculated cost in response
     created_at: datetime
     updated_at: datetime
-    # supplier_name: Optional[str] = None # Populate in endpoint
-    # store_name: Optional[str] = None # Populate in endpoint
-    # items: Optional[List['PurchaseOrderItemResponse']] = [] # Populate in endpoint
+    # Optional related data
+    # items: List['PurchaseOrderItemResponse'] = []
 
-    @validator("status", pre=True, always=True)
-    def convert_po_status(cls, v):
-        if isinstance(v, enum.Enum):
-            return v.value
-        return v
+    # Validator to convert Enums for response
+    _enum_converter = enum_validator(convert_enum_to_string)
 
     class Config:
-        orm_mode = True
-
+        from_attributes = True
 
 # ---------------------------
 # PurchaseOrderItem Schemas
 # ---------------------------
 class PurchaseOrderItemBase(BaseModel):
-    # purchase_order_id is context
     item_id: int
-    quantity: int
-    unit_price: float # Cost price from supplier for this PO
-    measurement_unit: Optional[str] = None
+    quantity_ordered: int = Field(..., gt=0) # Renamed and must be > 0
+    unit_price: float = Field(..., ge=0) # Cost price >= 0
+    measurement_unit: Optional[str] = Field(None, max_length=50)
 
 class PurchaseOrderItemCreate(PurchaseOrderItemBase):
-    # Used when creating items for a specific PO
-    purchase_order_id: int
+    purchase_order_id: int # Required when creating individually
 
 class PurchaseOrderItemResponse(PurchaseOrderItemBase):
     purchase_order_item_id: int
-    purchase_order_id: int # Include PO id in response
-    created_at: datetime
-    updated_at: datetime
-    # item_name: Optional[str] = None # Populate in endpoint
+    purchase_order_id: int
+    quantity_received: int = Field(0, ge=0) # Include received quantity
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
+# ---------------------------
+# Special Payload Schemas
+# ---------------------------
+class ProcessSalePayload(BaseModel):
+    sale_data: SalesCreate
+    sale_items: List[SaleItemBase] # Items don't have sale_id yet
+    payments_data: List[PaymentCreate] # List of payments made
 
-# --- NEW Schemas for Dashboard Endpoints (Added at the end) ---
+    class Config:
+        from_attributes = True # Not strictly needed for payload, but harmless
 
+class LoginSchema(BaseModel):
+    email: EmailStr
+    password: str
+
+class LoginResponse(BaseModel):
+    token: str
+    staff_id: int
+    role: str # Send enum value as string
+    full_name: str
+    is_manager: bool
+
+    class Config:
+        from_attributes = True # Map from Staff object
+
+# --- Dashboard Specific Response Schemas ---
 class LowStockItemResponse(BaseModel):
     item_name: str
     store_name: str
@@ -758,15 +730,17 @@ class LowStockItemResponse(BaseModel):
     min_stock_level: int
 
     class Config:
-        orm_mode = True # Good practice
+        from_attributes = True
 
 class RecentSaleResponse(BaseModel):
     sale_id: int
-    created_at: str # Keep as string since we format it in the endpoint
+    created_at: str # Keep as string as it's pre-formatted
     total_amount: float
-    payment_status: str # Keep as string (enum value)
-    staff_name: Optional[str] = None # Mark as optional if staff might be deleted/null
-    customer_id: Optional[int] = None # Customer is optional on sales
+    payment_status: str # Send enum value as string
+    staff_name: Optional[str] = None
+    customer_id: Optional[int] = None
+    # Optional: add customer_name if needed
+    # customer_name: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True

@@ -1,112 +1,141 @@
 // assets/js/checkout.js
 
+"use strict";
+
 // ---------------------
 // Global Variables & Constants
 // ---------------------
 const BASE_URL = "http://127.0.0.1:8000"; // Your API Base URL
 
 // State Variables
-let modalInput = "0";            // For product quantity modal
-let cashModalInput = "";         // For cash received modal
-let customerModalInput = "";     // For customer phone modal number pad
-let selectedProduct = null;      // Product being added/edited via modal
-let selectedCustomerId = null;   // ID of the selected customer
-let currentOrder = [];           // Array of { product: {}, quantity: number } objects
-let lastOrderId = null;          // ID of the last successfully processed order
-let categories = [];             // Cache for categories
-let allProducts = [];            // Cache for all products
+let modalInput = "0";
+let cashModalInput = "";
+let customerModalInput = "";
+let selectedProduct = null;
+let selectedCustomerId = null;
+let currentOrder = []; // Array of { product: {..., quantity: backend_stock_quantity}, quantity: number_in_order }
+let lastOrderId = null;
+let categories = [];
+let allProducts = []; // Holds products with stock quantity from backend
 
 // --- DOM Element References ---
-// Modals
+// (Keep all the element references from your original code)
 const productModal = document.getElementById("productModal");
 const cashModal = document.getElementById("cashModal");
 const customerModal = document.getElementById("customerModal");
-const loadingOverlay = document.getElementById('loadingOverlay'); // Loading Indicator
-const globalErrorDisplay = document.getElementById('globalErrorDisplay'); // Error Display
-
-// Product Modal Elements
+const loadingOverlay = document.getElementById('loadingOverlay');
+const globalErrorDisplay = document.getElementById('globalErrorDisplay');
 const modalProductName = document.getElementById("modalProductName");
 const modalProductPrice = document.getElementById("modalProductPrice");
 const modalQuantityDisplay = document.getElementById("modalQuantityDisplay");
 const modalQuantityEl = document.getElementById("modalQuantity");
 const modalTotalEl = document.getElementById("modalTotal");
 const modalConfirmBtn = document.getElementById("modalConfirm");
-
-// Cash Modal Elements
 const cashDisplay = document.getElementById("cashDisplay");
 const cashReceivedInput = document.getElementById("cashReceived");
 const changeDisplay = document.getElementById("changeDisplay");
-
-// Customer Modal Elements
 const customerPhoneDisplay = document.getElementById("customerPhoneDisplay");
 const customerResultsArea = document.getElementById("customerResultsArea");
 const addCustomerSection = document.getElementById("addCustomerSection");
 const newCustomerNameInput = document.getElementById("newCustomerNameInput");
 const newCustomerEmailInput = document.getElementById("newCustomerEmailInput");
 const customerMessageArea = document.getElementById("customerMessageArea");
-
-// Main Page Elements
 const categoryListEl = document.getElementById("categoryList");
 const productListEl = document.getElementById("productList");
 const productSearchInput = document.getElementById("productSearch");
 const orderItemsEl = document.getElementById("orderItems");
 const orderTotalEl = document.getElementById("orderTotal");
+const subtotalDisplayEl = document.getElementById("subtotalDisplay")?.querySelector('span'); // Get span inside
+const discountDisplayEl = document.getElementById("discountDisplay")?.querySelector('span'); // Get span inside
+const taxDisplayEl = document.getElementById("taxDisplay")?.querySelector('span'); // Get span inside
 const discountSelect = document.getElementById("discountSelect");
 const taxSelect = document.getElementById("taxSelect");
 const paymentMethodSelect = document.getElementById("paymentMethodSelect");
 const customerDisplayInput = document.getElementById("customerDisplay");
-const selectedCustomerIdInput = document.getElementById("selectedCustomerId"); // Hidden input
+const selectedCustomerIdInput = document.getElementById("selectedCustomerId");
 const checkoutBtn = document.getElementById("checkoutBtn");
 const printReceiptBtn = document.getElementById("printReceiptBtn");
 const clearOrderBtn = document.getElementById("clearOrderBtn");
 
+
 // ---------------------
 // Utility Functions
 // ---------------------
-/**
- * Fetches data from the API with error handling.
- * @param {string} url - The API endpoint URL.
- * @param {object} options - Fetch options (method, headers, body).
- * @returns {Promise<any>} - The JSON response data.
- * @throws {Error} - If the fetch fails or the response is not ok.
- */
+// assets/js/checkout.js
+
 async function fetchData(url, options = {}) {
-    console.log(`Fetching ${options.method || 'GET'} ${url}`, options.body ? 'with body' : '');
+    const method = options.method || 'GET';
+    console.log(`Fetching ${method} ${url}`, options.body ? 'with body...' : '');
+    showLoadingIndicators(true, options.loadingMsg || "Loading...");
+
     try {
         const response = await fetch(url, options);
+        const responseClone = response.clone(); // Clone for reading body on error
+
         if (!response.ok) {
             let errorDetail = `HTTP error ${response.status}: ${response.statusText}`;
             let errorJson = null;
+            let validationErrors = null;
+
             try {
-                // Try to get more specific error from backend response body
                 errorJson = await response.json();
-                errorDetail = errorJson.detail || errorDetail;
-                console.error('Backend Error Detail:', errorJson);
+                if (response.status === 422 && errorJson.detail) {
+                    validationErrors = errorJson.detail;
+                    // Try to format validation errors nicely
+                    if (Array.isArray(validationErrors)) {
+                        errorDetail = validationErrors.map(err => `${err.loc.join(' -> ')}: ${err.msg}`).join('; ');
+                    } else {
+                       errorDetail = JSON.stringify(validationErrors);
+                    }
+                    errorDetail = `Validation Error(s): ${errorDetail}`; // Prepend context
+                    console.error('--- FastAPI Validation Errors ---');
+                    console.error(JSON.stringify(validationErrors, null, 2));
+                    console.error('--- Offending Payload (if POST/PUT) ---');
+                     if (options.body) {
+                       try { console.error(JSON.parse(options.body)); } catch { console.error("Could not re-parse body for logging."); }
+                    }
+                    console.error('--- End Validation Error Details ---');
+                } else {
+                    errorDetail = errorJson.detail || JSON.stringify(errorJson) || errorDetail;
+                    console.error('Backend Error Detail:', errorJson);
+                }
             } catch (jsonError) {
-                console.warn("Could not parse error response as JSON or response was empty.");
+                try {
+                    const textError = await responseClone.text();
+                    console.warn("Could not parse error response as JSON. Response text:", textError);
+                    if (textError) errorDetail = textError.substring(0, 200); // Limit length
+                } catch (textParseError) {
+                    console.warn("Could not parse error response as JSON or read as text.");
+                }
             }
             const error = new Error(errorDetail);
-            error.status = response.status; // Attach status code to error object
-            error.json = errorJson; // Attach parsed JSON error if available
-            throw error;
+            error.status = response.status;
+            error.json = errorJson;
+            error.validation_errors = validationErrors;
+            throw error; // <<<--- RE-THROW THE ERROR ---<<<
         }
-        // Handle cases with no content (like DELETE or sometimes PUT/POST)
+
+        // Handle successful responses
         if (response.status === 204) {
             console.log(`Fetch successful (204 No Content) for ${url}`);
             return null;
         }
+
         const data = await response.json();
         console.log(`Fetch successful for ${url}`);
         return data;
-    } catch (error) {
-        console.error(`Fetch error for ${url}:`, error);
-        // Display user-friendly message for network errors or server issues
-        displayGlobalError(`Network or server error when contacting API. Please check connection or try again later. (${error.message})`);
-        throw error; // Re-throw the error to be caught by the caller
+
+    } catch (error) { // Catches fetch errors AND errors thrown from !response.ok block
+        console.error(`Fetch error during request to ${url}:`, error);
+        // Display message using the error passed up or caught directly
+        displayGlobalError(`API Error: ${error.message}. Please check connection or details.`);
+        throw error; // <<<--- RE-THROW THE ERROR TO THE CALLER ---<<<
+
+    } finally {
+         showLoadingIndicators(false);
     }
 }
 
-/** Debounce function to limit rapid function calls (e.g., search input) */
 function debounce(func, delay) {
     let timeoutId;
     return function(...args) {
@@ -117,6 +146,36 @@ function debounce(func, delay) {
     };
 }
 
+function showLoadingIndicators(isLoading, message = "Processing...") {
+    if (isLoading) {
+        loadingOverlay.textContent = message;
+        loadingOverlay.style.display = 'flex';
+        checkoutBtn.disabled = true;
+        clearOrderBtn.disabled = true;
+        printReceiptBtn.disabled = true;
+    } else {
+        loadingOverlay.style.display = 'none';
+        // Re-enable based on state
+        checkoutBtn.disabled = currentOrder.length === 0; // Disable if order empty
+        clearOrderBtn.disabled = currentOrder.length === 0 && !selectedCustomerId && !cashReceivedInput.value; // Disable if nothing to clear
+        printReceiptBtn.disabled = !lastOrderId;
+        printReceiptBtn.style.display = lastOrderId ? 'block' : 'none'; // Show/hide print button
+    }
+    // console.log(`Loading state: ${isLoading}`); // Can be noisy
+}
+
+function displayGlobalError(message) {
+    if (message) {
+        globalErrorDisplay.textContent = message;
+        globalErrorDisplay.style.display = 'block';
+        // Auto-hide after a delay?
+        // setTimeout(() => displayGlobalError(''), 7000);
+    } else {
+        globalErrorDisplay.style.display = 'none';
+        globalErrorDisplay.textContent = '';
+    }
+}
+
 
 // ---------------------
 // Initialization
@@ -125,25 +184,21 @@ document.addEventListener('DOMContentLoaded', initializeCheckout);
 
 async function initializeCheckout() {
     console.log("Initializing Checkout Page...");
-    showLoadingIndicators(true, "Loading initial data..."); // Show loading state
+    showLoadingIndicators(true, "Loading initial data...");
 
     try {
-        // Load initial data in parallel for faster startup
         await Promise.all([
             loadCategories(),
-            loadProducts(),
+            loadProducts(), // Now loads products WITH stock
             loadDiscountOptions(),
             loadTaxOptions(),
             loadPaymentMethods()
         ]);
 
-        // Initial UI setup
-        renderOrder(); // Render empty order state
-        updateModalDisplay(); // Initialize product modal display state
-        updateCashModalDisplay(); // Initialize cash modal display state
-        updateCustomerModalDisplay(); // Initialize customer modal display state
-
-        // Attach event listeners after initial load
+        renderOrder();
+        updateModalDisplay();
+        updateCashModalDisplay();
+        updateCustomerModalDisplay();
         attachEventListeners();
 
         console.log("Checkout Page Initialized Successfully.");
@@ -151,77 +206,31 @@ async function initializeCheckout() {
 
     } catch (error) {
         console.error("Initialization failed:", error);
-        // DisplayGlobalError is likely already called by fetchData, but ensure message is clear
-        displayGlobalError(`Failed to initialize the checkout system. ${error.message}. Please try refreshing.`);
+        displayGlobalError(`Failed to initialize the checkout system: ${error.message}. Please try refreshing.`);
     } finally {
-        showLoadingIndicators(false); // Hide loading state
-        // Enable buttons after loading
-        checkoutBtn.disabled = false;
-        clearOrderBtn.disabled = false;
+        showLoadingIndicators(false); // Hide loading state AFTER potentially enabling buttons
+        // Ensure correct initial button states
+        checkoutBtn.disabled = currentOrder.length === 0;
+        clearOrderBtn.disabled = currentOrder.length === 0 && !selectedCustomerId && !cashReceivedInput.value;
+        printReceiptBtn.disabled = !lastOrderId;
+        printReceiptBtn.style.display = lastOrderId ? 'block' : 'none';
     }
 }
-
-function showLoadingIndicators(isLoading, message = "Processing...") {
-    if (isLoading) {
-        loadingOverlay.textContent = message;
-        loadingOverlay.style.display = 'flex';
-        // Disable key buttons during loading
-        checkoutBtn.disabled = true;
-        clearOrderBtn.disabled = true;
-        printReceiptBtn.disabled = true;
-    } else {
-        loadingOverlay.style.display = 'none';
-        // Re-enable buttons (except print button, which depends on lastOrderId)
-        checkoutBtn.disabled = false;
-        clearOrderBtn.disabled = false;
-        printReceiptBtn.disabled = !lastOrderId; // Only enable if there's an order ID
-    }
-    console.log(`Loading state: ${isLoading}`);
-}
-
-function displayGlobalError(message) {
-    if (message) {
-        globalErrorDisplay.textContent = message;
-        globalErrorDisplay.style.display = 'block';
-    } else {
-        globalErrorDisplay.style.display = 'none';
-        globalErrorDisplay.textContent = '';
-    }
-}
-
 
 function attachEventListeners() {
-    // Product Search (with debounce)
     productSearchInput.addEventListener("input", debounce(handleProductSearch, 300));
-    // Also handle 'Enter' key for barcode scanner emulation
     productSearchInput.addEventListener("keypress", (event) => {
         if (event.key === "Enter") {
-            event.preventDefault(); // Prevent form submission if it were in a form
-            handleProductSearch(event); // Trigger search immediately
+            event.preventDefault();
+            handleProductSearch(event);
         }
     });
-
-
-    // Modal Buttons (Confirmations)
     modalConfirmBtn.addEventListener("click", confirmProductModal);
-
-    // Order Actions
     clearOrderBtn.addEventListener("click", handleClearOrder);
     checkoutBtn.addEventListener("click", handleCheckout);
     printReceiptBtn.addEventListener("click", handlePrintReceipt);
-
-    // Input Triggers for Modals
-    // cashReceivedInput.addEventListener("click", openCashModal); // Now handled by modal
-    // customerDisplayInput.addEventListener("click", openCustomerModal); // Now handled by modal
-
-    // Dropdown Changes affecting Total
     discountSelect.addEventListener("change", renderOrder);
     taxSelect.addEventListener("change", renderOrder);
-
-    // Cash Input Change (manual typing - disable if using modal only)
-    // cashReceivedInput.addEventListener("input", updateChangeDisplay);
-
-    // Close Modals when clicking outside (optional but good UX)
     window.addEventListener('click', (event) => {
         if (event.target == productModal) closeProductModal();
         if (event.target == cashModal) closeCashModal();
@@ -230,66 +239,57 @@ function attachEventListeners() {
 }
 
 // ---------------------
-// Data Loading Functions (Categories, Products, Discounts, Taxes, Payment Methods)
+// Data Loading Functions
 // ---------------------
 async function loadCategories() {
     try {
-        categories = await fetchData(`${BASE_URL}/categories/`);
+        categories = await fetchData(`${BASE_URL}/categories/`, { loadingMsg: "Loading categories..." });
         renderCategories();
     } catch (error) {
         categoryListEl.innerHTML = '<li>Error loading categories</li>';
-        // Initialization error handling will catch this
-        throw error; // Re-throw to stop initialization if critical
+        throw error;
     }
 }
 
 async function loadProducts() {
     try {
-        allProducts = await fetchData(`${BASE_URL}/items/`);
-        // !! IMPORTANT !! Backend should provide stock. Remove this simulation.
-        allProducts.forEach(p => {
-            // Example: Assuming backend provides stock in `stock_level` field
-            // p.current_stock = p.stock_level !== undefined ? p.stock_level : null;
-            // --- Simulation (REMOVE LATER) ---
-            if (p.current_stock === undefined) {
-                p.current_stock = Math.floor(Math.random() * 50) + 10; // Placeholder
-            }
-             // --- End Simulation ---
-        });
-        renderProducts(allProducts); // Initial render
+        // Fetches items including stock 'quantity' from the modified backend endpoint
+        allProducts = await fetchData(`${BASE_URL}/items/`, { loadingMsg: "Loading products..." });
+        // Backend now provides stock quantity, no simulation needed.
+        // Ensure field name matches backend (e.g., 'quantity')
+        renderProducts(allProducts);
     } catch (error) {
         productListEl.innerHTML = '<p class="no-products-message">Error loading products.</p>';
-        throw error; // Re-throw
+        throw error;
     }
 }
 
 async function loadDiscountOptions() {
     try {
-        const activeDiscounts = await fetchData(`${BASE_URL}/discounts/?status=active`);
+        const activeDiscounts = await fetchData(`${BASE_URL}/discounts/?status=active`, { loadingMsg: "Loading discounts..." });
         discountSelect.innerHTML = `<option value="0" data-type="fixed_amount" data-id="0">No Discount</option>`;
         activeDiscounts.forEach(d => {
             const option = document.createElement("option");
             option.dataset.type = d.discount_type;
             option.value = d.discount_value;
-            option.dataset.id = d.discount_id; // Store discount ID if needed later
+            option.dataset.id = d.discount_id;
             option.textContent = `${d.discount_name} (${d.discount_type === "percentage" ? `${d.discount_value}%` : `Rs ${parseFloat(d.discount_value).toFixed(2)}`})`;
             discountSelect.appendChild(option);
         });
     } catch (error) {
         console.error("Failed to load discounts:", error);
         discountSelect.innerHTML = `<option value="0">Error loading discounts</option>`;
-        // Optionally display a more visible error
     }
 }
 
 async function loadTaxOptions() {
     try {
-        const activeTaxes = await fetchData(`${BASE_URL}/taxes/?status=active`);
-        taxSelect.innerHTML = `<option value="0" data-id="0">No Tax</option>`; // Default value 0, ID 0
+        const activeTaxes = await fetchData(`${BASE_URL}/taxes/?status=active`, { loadingMsg: "Loading taxes..." });
+        taxSelect.innerHTML = `<option value="0" data-id="0">No Tax</option>`;
         activeTaxes.forEach(t => {
             const option = document.createElement("option");
             option.value = t.tax_percentage;
-            option.dataset.id = t.tax_id; // Store tax ID
+            option.dataset.id = t.tax_id;
             option.textContent = `${t.tax_name} (${t.tax_percentage}%)`;
             taxSelect.appendChild(option);
         });
@@ -301,12 +301,11 @@ async function loadTaxOptions() {
 
 async function loadPaymentMethods() {
     try {
-        const paymentMethods = await fetchData(`${BASE_URL}/payment_methods/`);
-        paymentMethodSelect.innerHTML = `<option value="">Select Payment Method</option>`; // Default
+        const paymentMethods = await fetchData(`${BASE_URL}/payment_methods/`, { loadingMsg: "Loading payment methods..." });
+        paymentMethodSelect.innerHTML = `<option value="">Select Payment Method</option>`;
         paymentMethods.forEach(pm => {
             const option = document.createElement("option");
             option.value = pm.payment_method_id;
-            // Store name in lowercase for easy comparison later if needed
             option.dataset.name = pm.payment_method_name.toLowerCase();
             option.textContent = pm.payment_method_name;
             paymentMethodSelect.appendChild(option);
@@ -318,18 +317,16 @@ async function loadPaymentMethods() {
 }
 
 // ---------------------
-// UI Rendering Functions (Categories, Products, Order)
+// UI Rendering Functions
 // ---------------------
 function renderCategories() {
-    categoryListEl.innerHTML = ""; // Clear previous
-    // Add "All" category
+    categoryListEl.innerHTML = "";
     const allLi = document.createElement("li");
     allLi.textContent = "All";
-    allLi.dataset.categoryId = ""; // Use empty string for 'All'
-    allLi.classList.add("active"); // Start with 'All' selected
+    allLi.dataset.categoryId = "";
+    allLi.classList.add("active");
     allLi.addEventListener("click", () => handleCategoryClick(allLi));
     categoryListEl.appendChild(allLi);
-    // Add fetched categories
     categories.forEach(cat => {
         const li = document.createElement("li");
         li.textContent = cat.category_name;
@@ -342,17 +339,19 @@ function renderCategories() {
 function renderProducts(productsToRender) {
     productListEl.innerHTML = ""; // Clear previous
     if (!productsToRender || productsToRender.length === 0) {
-        productListEl.innerHTML = '<p class="no-products-message">No products found matching your criteria.</p>';
+        productListEl.innerHTML = '<p class="no-products-message">No products found.</p>';
         return;
     }
     productsToRender.forEach(product => {
         const prodEl = document.createElement("div");
         prodEl.classList.add("product");
         prodEl.dataset.productId = product.item_id;
-        // Ensure price is treated as a number for formatting
-        const price = parseFloat(product.price) || 0; // Default to 0 if price is invalid/null
-        const stock = product.current_stock;
-        const isLowStock = stock !== null && stock <= (product.min_stock_level || 5); // Assuming min_stock_level might be on product
+
+        const price = parseFloat(product.price) || 0;
+        // Use the 'quantity' field directly from the backend API response
+        const stock = (product.quantity !== null && product.quantity !== undefined) ? product.quantity : null;
+        const minStock = product.min_stock_level || 5; // Use default if not provided
+        const isLowStock = stock !== null && stock < minStock; // Correct low stock check
 
         prodEl.innerHTML = `
             <img src="${product.image_url || 'assets/imgs/default_item.jpg'}" alt="${product.item_name}">
@@ -362,55 +361,70 @@ function renderProducts(productsToRender) {
                 Stock: ${stock !== null ? stock : 'N/A'}
             </p>
         `;
-        // Add low stock visual cue if needed in CSS (e.g., .product .low-stock { color: red; font-weight: bold; })
-        prodEl.addEventListener("click", () => openProductModal(product));
+        if (stock === 0) {
+            prodEl.classList.add('out-of-stock'); // Add class if needed for styling
+            prodEl.title = "Out of Stock"; // Tooltip
+            // Optionally prevent click if out of stock
+            // prodEl.style.opacity = '0.6';
+            // prodEl.style.cursor = 'not-allowed';
+        } else {
+            prodEl.addEventListener("click", () => openProductModal(product));
+        }
+
         productListEl.appendChild(prodEl);
     });
 }
 
 function renderOrder() {
-    orderItemsEl.innerHTML = ""; // Clear current items
+    orderItemsEl.innerHTML = "";
+    const totals = calculateTotal(); // Calculate totals first
+
     if (currentOrder.length === 0) {
         orderItemsEl.innerHTML = '<li class="no-items">No items in order</li>';
-        orderTotalEl.innerText = `Total: Rs 0.00`;
-        updateChangeDisplay(); // Update change display when order is empty
-        return;
+        orderTotalEl.innerText = `Rs 0.00`; // Only show final total here
+        // Clear breakdown
+        if (subtotalDisplayEl) subtotalDisplayEl.textContent = 'Rs 0.00';
+        if (discountDisplayEl) discountDisplayEl.textContent = '- Rs 0.00';
+        if (taxDisplayEl) taxDisplayEl.textContent = '+ Rs 0.00';
+    } else {
+        currentOrder.forEach((item) => {
+            const li = document.createElement("li");
+            const itemPrice = parseFloat(item.product.price) || 0;
+            const itemTotal = itemPrice * item.quantity;
+            li.innerHTML = `
+                <div class="item-info">
+                    <span class="item-name">${item.product.item_name}</span>
+                    <span class="item-qty-price">( ${item.quantity} x Rs ${itemPrice.toFixed(2)} )</span>
+                </div>
+                <div class="item-line-total">
+                    <span>Rs ${itemTotal.toFixed(2)}</span>
+                    <div class="order-item-controls">
+                        <button onclick="editOrderItem(${item.product.item_id})" title="Edit Quantity"><ion-icon name="create-outline"></ion-icon></button>
+                        <button onclick="removeFromOrder(${item.product.item_id})" title="Remove Item"><ion-icon name="trash-outline"></ion-icon></button>
+                    </div>
+                </div>
+            `;
+            orderItemsEl.appendChild(li);
+        });
+        // Update breakdown display
+         if (subtotalDisplayEl) subtotalDisplayEl.textContent = `Rs ${totals.subtotal.toFixed(2)}`;
+         if (discountDisplayEl) discountDisplayEl.textContent = `- Rs ${totals.discountAmount.toFixed(2)}`;
+         if (taxDisplayEl) taxDisplayEl.textContent = `+ Rs ${totals.taxAmount.toFixed(2)}`;
+         orderTotalEl.innerText = `Rs ${totals.finalTotal.toFixed(2)}`;
     }
 
-    currentOrder.forEach((item) => {
-        const li = document.createElement("li");
-        const itemPrice = parseFloat(item.product.price) || 0;
-        const itemTotal = itemPrice * item.quantity;
-        li.innerHTML = `
-            <div class="item-info">
-                <span class="item-name">${item.product.item_name}</span>
-                <span class="item-qty-price">( ${item.quantity} x Rs ${itemPrice.toFixed(2)} )</span>
-            </div>
-            <div class="item-line-total">
-                <span>Rs ${itemTotal.toFixed(2)}</span>
-                <div class="order-item-controls">
-                    <button onclick="editOrderItem(${item.product.item_id})" title="Edit Quantity"><ion-icon name="create-outline"></ion-icon></button>
-                    <button onclick="removeFromOrder(${item.product.item_id})" title="Remove Item"><ion-icon name="trash-outline"></ion-icon></button>
-                </div>
-            </div>
-        `;
-        orderItemsEl.appendChild(li);
-    });
-
-    // Recalculate total and update display
-    const totals = calculateTotal();
-    orderTotalEl.innerText = `Total: Rs ${totals.finalTotal.toFixed(2)}`;
-    // Add breakdown below total (optional)
-    // E.g., document.getElementById('subtotalDisplay').innerText = `Subtotal: Rs ${totals.subtotal.toFixed(2)}`;
-    updateChangeDisplay(); // Update change display whenever order total changes
+    updateChangeDisplay();
+    // Update button states based on order content
+    checkoutBtn.disabled = currentOrder.length === 0;
+    clearOrderBtn.disabled = currentOrder.length === 0 && !selectedCustomerId && !cashReceivedInput.value;
 }
 
 
 // ---------------------
-// Event Handlers (Search, Category Click, Clear Order, Print Receipt)
+// Event Handlers
 // ---------------------
 function handleProductSearch(event) {
-    const query = productSearchInput.value.toLowerCase().trim(); // Use the input field directly
+    const query = productSearchInput.value.toLowerCase().trim();
     const activeCategoryLi = categoryListEl.querySelector("li.active");
     const activeCategoryId = activeCategoryLi ? activeCategoryLi.dataset.categoryId : "";
 
@@ -418,174 +432,162 @@ function handleProductSearch(event) {
 
     let filtered = allProducts;
 
-    // Filter by active category first (if not 'All')
     if (activeCategoryId) {
         filtered = filtered.filter(product => product.category_id == activeCategoryId);
     }
 
-    // Then filter by search query (name or barcode)
     if (query) {
-        filtered = filtered.filter(product =>
-            (product.item_name && product.item_name.toLowerCase().includes(query)) ||
-            (product.barcode && product.barcode === query) // Exact match for barcode
-        );
-        // If barcode matches exactly, potentially add directly to cart? (Advanced)
-         if (filtered.length === 1 && filtered[0].barcode === query) {
-            console.log("Barcode match found:", filtered[0].item_name);
-            // Optional: Automatically open modal or add qty 1?
-             // openProductModal(filtered[0]); // Example: open modal
-            // addToOrder(filtered[0], 1); // Example: add 1 automatically
-            // productSearchInput.value = ""; // Clear search after barcode scan
-         }
+        const potentialBarcode = filtered.find(product => product.barcode === query);
 
+        if (potentialBarcode && event.type === 'keypress' && event.key === 'Enter') {
+             // Exact barcode match on Enter key press
+             console.log("Barcode match found:", potentialBarcode.item_name);
+             openProductModal(potentialBarcode); // Open modal for barcode scan
+             productSearchInput.value = ""; // Clear search after barcode scan
+             productSearchInput.blur(); // Lose focus to prevent accidental rescans
+             filtered = []; // Prevent showing only this item in the list after modal opens
+        } else {
+             // Filter by name or partial barcode
+             filtered = filtered.filter(product =>
+                (product.item_name && product.item_name.toLowerCase().includes(query)) ||
+                (product.barcode && product.barcode.includes(query)) // Allow partial barcode match for text search
+            );
+        }
     }
     renderProducts(filtered);
 }
 
+
 function handleCategoryClick(clickedLi) {
-    // Remove active class from all, add to clicked
     categoryListEl.querySelectorAll("li").forEach(li => li.classList.remove("active"));
     clickedLi.classList.add("active");
-
     const categoryId = clickedLi.dataset.categoryId;
     console.log(`Category selected: ID=${categoryId || 'All'}`);
-
-    let productsToDisplay = allProducts;
-    if (categoryId) {
-        productsToDisplay = allProducts.filter(p => p.category_id == categoryId);
-    }
-
+    let productsToDisplay = categoryId
+        ? allProducts.filter(p => p.category_id == categoryId)
+        : allProducts;
     renderProducts(productsToDisplay);
-    productSearchInput.value = ""; // Clear search when category changes
+    productSearchInput.value = "";
 }
 
-// Find the handleClearOrder function
 function handleClearOrder() {
-    if (currentOrder.length === 0 && !cashReceivedInput.value && !customerDisplayInput.value && !selectedCustomerId) {
-        console.log("Clear Order: Nothing to clear.");
-        return; // Nothing to clear
+    const anythingToClear = currentOrder.length > 0 ||
+                           selectedCustomerId ||
+                           cashReceivedInput.value ||
+                           discountSelect.value !== "0" ||
+                           taxSelect.value !== "0" ||
+                           paymentMethodSelect.value !== "";
+
+    if (!anythingToClear) {
+        console.log("Clear Order: Nothing significant to clear.");
+        return;
     }
 
-    // Using standard confirm for broader compatibility:
     if (!confirm("Are you sure you want to clear the entire order and selections?")) {
         return;
     }
 
-    console.log("Clearing order...");
+    console.log("Clearing order state...");
     currentOrder = [];
     selectedCustomerId = null;
-    // lastOrderId = null; // Resetting lastOrderId here might be okay, OR you could leave it until the next successful order overrides it. Let's leave it for now so print remains available until the next order starts.
+    lastOrderId = null; // Reset the printable order ID
 
     // Reset UI elements
     discountSelect.value = "0";
     taxSelect.value = "0";
     paymentMethodSelect.value = "";
     cashReceivedInput.value = "";
-    cashModalInput = ""; // Reset modal input too
+    cashModalInput = "";
     changeDisplay.innerText = "";
+    changeDisplay.style.color = 'inherit';
     customerDisplayInput.value = "";
-    customerModalInput = ""; // Reset customer modal input
+    customerModalInput = "";
     selectedCustomerIdInput.value = "";
+    customerMessageArea.textContent = "";
+    customerResultsArea.innerHTML = "";
+    addCustomerSection.style.display = "none";
+    newCustomerNameInput.value = "";
+    newCustomerEmailInput.value = "";
+    displayGlobalError(''); // Clear global errors
 
-    // --- REMOVE OR COMMENT OUT THESE LINES ---
-    // printReceiptBtn.style.display = "none"; // Don't hide it here
-    // printReceiptBtn.disabled = true;      // Don't disable it here
-    // --- END OF REMOVAL ---
+    // Reset buttons to initial state
+    printReceiptBtn.style.display = "none";
+    printReceiptBtn.disabled = true;
 
-    renderOrder(); // Update the order display (shows "No items")
-    updateCashModalDisplay(); // Reset cash display if modal was open
-    updateCustomerModalDisplay(); // Reset customer phone display
-    console.log("Order Cleared.");
+    renderOrder(); // Update the order display (shows "No items", updates button states)
+    updateCashModalDisplay();
+    updateCustomerModalDisplay();
+    console.log("Order State Cleared.");
 
-    // Optional: Re-focus the search input for the next order
     productSearchInput.focus();
 }
+
 
 function handlePrintReceipt() {
     if (!lastOrderId) {
         console.warn("Print Receipt clicked but lastOrderId is null.");
-        alert("No successfully completed order available to print receipt.");
+        alert("No completed order available to print receipt.");
         return;
     }
-    console.log(`Printing receipt for Order ID: ${lastOrderId}`);
+    console.log(`Attempting to print receipt for Order ID: ${lastOrderId}`);
     const url = `${BASE_URL}/sales/${lastOrderId}/receipt/pdf`;
-
-    // For Electron, opening a PDF might be handled differently for better integration
-    // Option 1: Standard window.open (might open in default browser or download)
-    window.open(url, "_blank");
-
-    // Option 2: Using Electron's shell module (opens in default PDF viewer)
-    // if (typeof require === 'function') { // Check if in Node.js/Electron context
-    //     try {
-    //         const { shell } = require('electron');
-    //         shell.openExternal(url);
-    //     } catch (e) {
-    //         console.warn("Electron shell module not available, falling back to window.open");
-    //         window.open(url, "_blank");
-    //     }
-    // } else {
-    //     window.open(url, "_blank");
-    // }
-
-    // Option 3: Embed PDF in a new Electron window (more complex)
-    // Requires setting up a new BrowserWindow and loading the URL or PDF data
-
-    // After attempting print, maybe hide the button again? Or leave it?
-    // printReceiptBtn.style.display = 'none';
+    const pdfWindow = window.open(url, "_blank");
+    if (!pdfWindow || pdfWindow.closed || typeof pdfWindow.closed === 'undefined') {
+        console.warn("window.open might have been blocked by a pop-up blocker.");
+        alert("Could not open receipt window. Please check if your browser is blocking pop-ups for this site.");
+    } else {
+        console.log("Receipt window opened (or attempted).");
+    }
 }
 
 // ---------------------
-// Order Management (Add, Remove, Edit, Calculate Total)
+// Order Management
 // ---------------------
 function addToOrder(product, quantity) {
     if (!product || quantity <= 0) return;
 
     const existingIndex = currentOrder.findIndex(item => item.product.item_id === product.item_id);
-    const availableStock = product.current_stock; // Use potentially simulated stock
+    // Use the stock quantity from the product object (fetched from backend)
+    const availableStock = (product.quantity !== null && product.quantity !== undefined) ? product.quantity : Infinity; // Treat null stock as infinite? Or handle differently?
 
-    // Ensure quantity is a number
     quantity = Number(quantity);
     if (isNaN(quantity)) {
         console.error("Invalid quantity passed to addToOrder:", quantity);
         return;
     }
 
-
-    if (existingIndex > -1) {
-        // Item exists, update quantity
+    if (existingIndex > -1) { // Item exists, update quantity
         const currentQuantity = currentOrder[existingIndex].quantity;
         const newQuantity = currentQuantity + quantity;
-
-        if (availableStock !== null && newQuantity > availableStock) {
-            alert(`Cannot add ${quantity} more of ${product.item_name}. Only ${availableStock - currentQuantity} more currently in stock (Total Available: ${availableStock}).`);
-            return; // Prevent adding beyond stock
+        if (newQuantity > availableStock) {
+            alert(`Cannot add ${quantity} more of ${product.item_name}. Only ${availableStock - currentQuantity} more in stock (Total Available: ${availableStock}).`);
+            return;
         }
         currentOrder[existingIndex].quantity = newQuantity;
         console.log(`Updated quantity for ${product.item_name} to ${newQuantity}`);
-    } else {
-        // New item, check stock before adding
-        if (availableStock !== null && quantity > availableStock) {
+    } else { // New item
+        if (quantity > availableStock) {
             alert(`Cannot add ${quantity} of ${product.item_name}. Only ${availableStock} available in stock.`);
-            return; // Prevent adding beyond stock
+            return;
         }
+        // Store the product object itself which now includes the backend stock `quantity`
         currentOrder.push({ product: product, quantity: quantity });
         console.log(`Added ${quantity} of ${product.item_name} to order.`);
     }
-    renderOrder(); // Update the displayed order list and total
+    renderOrder();
 }
+
 
 function editOrderItem(productId) {
     const itemIndex = currentOrder.findIndex(i => i.product.item_id === productId);
     if (itemIndex > -1) {
         const itemToEdit = currentOrder[itemIndex];
         console.log(`Editing item: ${itemToEdit.product.item_name}`);
-        selectedProduct = itemToEdit.product; // Set the product for the modal
-        modalInput = String(itemToEdit.quantity); // Set current quantity in modal input
-        updateModalDisplay(); // Update modal view based on modalInput
+        selectedProduct = itemToEdit.product;
+        modalInput = String(itemToEdit.quantity);
+        updateModalDisplay();
         productModal.style.display = "flex";
-
-        // Mark the confirm button to indicate we are editing this specific item
-        modalConfirmBtn.dataset.editingItemId = productId;
+        modalConfirmBtn.dataset.editingItemId = productId; // Mark as editing
     } else {
         console.warn(`Attempted to edit item ID ${productId} but it was not found in the order.`);
     }
@@ -595,13 +597,12 @@ function removeFromOrder(productId) {
     const itemIndex = currentOrder.findIndex(i => i.product.item_id === productId);
     if (itemIndex > -1) {
         console.log(`Removing item: ${currentOrder[itemIndex].product.item_name}`);
-        currentOrder.splice(itemIndex, 1); // Remove item from array
-        renderOrder(); // Update display
+        currentOrder.splice(itemIndex, 1);
+        renderOrder();
     } else {
          console.warn(`Attempted to remove item ID ${productId} but it was not found in the order.`);
     }
 }
-
 
 function calculateTotal() {
     const subtotal = currentOrder.reduce((sum, item) => {
@@ -610,7 +611,7 @@ function calculateTotal() {
     }, 0);
 
     const discountOption = discountSelect.options[discountSelect.selectedIndex];
-    const discountType = discountOption?.dataset.type; // 'percentage' or 'fixed_amount'
+    const discountType = discountOption?.dataset.type;
     const discountValue = parseFloat(discountSelect.value) || 0;
 
     let discountAmount = 0;
@@ -619,18 +620,14 @@ function calculateTotal() {
     } else if (discountType === 'fixed_amount' && discountValue > 0) {
         discountAmount = discountValue;
     }
-    // Ensure discount doesn't exceed subtotal
-    discountAmount = Math.min(discountAmount, subtotal);
+    discountAmount = Math.min(discountAmount, subtotal); // Cannot discount more than subtotal
 
     const afterDiscount = subtotal - discountAmount;
 
     const taxPercentage = parseFloat(taxSelect.value) || 0;
-    // Calculate tax on the price *after* discount
-    const taxAmount = afterDiscount * (taxPercentage / 100);
+    const taxAmount = afterDiscount * (taxPercentage / 100); // Tax on discounted amount
 
     const finalTotal = afterDiscount + taxAmount;
-
-    // console.log(`Calc Total: Subtotal=${subtotal.toFixed(2)}, Discount=${discountAmount.toFixed(2)}, Tax=${taxAmount.toFixed(2)}, Final=${finalTotal.toFixed(2)}`);
 
     return {
         subtotal: subtotal,
@@ -639,7 +636,6 @@ function calculateTotal() {
         finalTotal: finalTotal
     };
 }
-
 
 // ---------------------
 // Product Modal Logic
@@ -650,10 +646,17 @@ function openProductModal(product) {
         alert("Error: Could not load product details.");
         return;
     }
-    console.log(`Opening modal for product: ${product.item_name} (ID: ${product.item_id})`);
+     // Check stock before opening modal if desired
+     const stock = (product.quantity !== null && product.quantity !== undefined) ? product.quantity : Infinity;
+     if (stock <= 0) {
+         alert(`${product.item_name} is out of stock.`);
+         return;
+     }
+
+    console.log(`Opening modal for product: ${product.item_name} (ID: ${product.item_id}, Stock: ${stock})`);
     selectedProduct = product;
-    modalInput = "1"; // Default to quantity 1 when opening for a *new* item
-    modalConfirmBtn.removeAttribute('data-editing-item-id'); // Clear editing flag initially
+    modalInput = "1";
+    modalConfirmBtn.removeAttribute('data-editing-item-id');
     modalProductName.textContent = product.item_name;
     modalProductPrice.textContent = `Price: Rs ${parseFloat(product.price || 0).toFixed(2)}`;
     updateModalDisplay();
@@ -661,23 +664,22 @@ function openProductModal(product) {
 }
 
 function closeProductModal() {
-    console.log("Closing product modal.");
     productModal.style.display = "none";
-    selectedProduct = null; // Clear selected product
-    modalInput = "0"; // Reset input
-    modalConfirmBtn.removeAttribute('data-editing-item-id'); // Ensure editing flag is clear
+    selectedProduct = null;
+    modalInput = "0";
+    modalConfirmBtn.removeAttribute('data-editing-item-id');
 }
 
 function modalAppend(value) {
-    // Allow adding digits only
     if (!/^\d$/.test(value)) return;
-
     if (modalInput === "0" && value !== "0") {
-        modalInput = value; // Replace leading zero unless the input is '0' itself
-    } else if (modalInput.length < 4) { // Limit quantity input (e.g., max 9999)
+        modalInput = value;
+    } else if (modalInput !== "0" && modalInput.length < 4) { // Prevent adding if already '0' unless it's the first digit
         modalInput += value;
-    } else {
-        console.warn("Max quantity input length reached.");
+    } else if (modalInput === "0" && value === "0") {
+         // Do nothing if input is '0' and user presses '0' again
+    } else if (modalInput.length >= 4) {
+         console.warn("Max quantity input length reached.");
     }
     updateModalDisplay();
 }
@@ -685,7 +687,7 @@ function modalAppend(value) {
 function modalBackspace() {
     modalInput = modalInput.slice(0, -1);
     if (modalInput === "") {
-        modalInput = "0"; // Default back to 0 if empty
+        modalInput = "0";
     }
     updateModalDisplay();
 }
@@ -696,24 +698,25 @@ function modalClear() {
 }
 
 function updateModalDisplay() {
-    const quantity = parseInt(modalInput) || 0; // Ensure it's a number, default 0
-    modalQuantityDisplay.textContent = modalInput || "0"; // Show the input string
-    modalQuantityEl.textContent = quantity; // Show the parsed number
+    const quantity = parseInt(modalInput) || 0;
+    modalQuantityDisplay.textContent = modalInput || "0";
+    modalQuantityEl.textContent = quantity;
 
     if (selectedProduct) {
         const price = parseFloat(selectedProduct.price) || 0;
         const total = quantity * price;
         modalTotalEl.textContent = total.toFixed(2);
     } else {
-        modalTotalEl.textContent = "0.00"; // Reset if no product selected
+        modalTotalEl.textContent = "0.00";
     }
 }
+
 
 function confirmProductModal() {
     const quantity = parseInt(modalInput);
     if (isNaN(quantity) || quantity <= 0) {
         alert("Please enter a valid quantity (at least 1).");
-        modalInput = "1"; // Reset input to 1
+        modalInput = "1";
         updateModalDisplay();
         return;
     }
@@ -725,71 +728,62 @@ function confirmProductModal() {
         return;
     }
 
-    const editingItemId = modalConfirmBtn.dataset.editingItemId; // Check if we were editing
+    const editingItemId = modalConfirmBtn.dataset.editingItemId;
+    // Get available stock from the selected product object
+    const availableStock = (selectedProduct.quantity !== null && selectedProduct.quantity !== undefined) ? selectedProduct.quantity : Infinity;
 
-    // Stock check (using potentially simulated stock value)
-    // IMPORTANT: Replace 'current_stock' with your actual stock field name from API
-    const availableStock = selectedProduct.current_stock;
-    if (availableStock !== null && availableStock !== undefined) {
-        if (editingItemId) {
-            // If editing, check against stock *excluding* the original quantity of this item
-            const itemIndex = currentOrder.findIndex(i => i.product.item_id == editingItemId);
-            const originalQuantity = (itemIndex > -1) ? currentOrder[itemIndex].quantity : 0;
-            const stockNeeded = quantity - originalQuantity; // How many *more* are needed
-            const currentStockExcludingThis = availableStock; // Assume backend gave current total stock
-
-            // This logic is slightly complex. A simpler check:
-            if (quantity > availableStock) {
-                 alert(`Insufficient stock for ${selectedProduct.item_name}. Only ${availableStock} available.`);
-                 return;
-            }
-
-        } else {
-            // If adding new or increasing quantity of existing non-edited item
-            const existingItem = currentOrder.find(i => i.product.item_id === selectedProduct.item_id);
-            const currentOrderQty = existingItem ? existingItem.quantity : 0;
-             if ((currentOrderQty + quantity) > availableStock) {
-                  alert(`Insufficient stock for ${selectedProduct.item_name}. Only ${availableStock - currentOrderQty} more can be added (Total Available: ${availableStock}).`);
-                  return;
-             }
-        }
-    } else {
-        console.warn(`Stock level for ${selectedProduct.item_name} is null or undefined. Skipping stock check.`);
-        // Decide if you want to allow adding if stock is unknown, or block it.
-        // Example: Allow adding if stock is unknown
-    }
-
-
+    // Stock Check
     if (editingItemId) {
+        // If editing, the entered quantity is the *new total* quantity for this item
+        if (quantity > availableStock) {
+             alert(`Insufficient stock for ${selectedProduct.item_name}. Only ${availableStock} available.`);
+             modalInput = String(availableStock > 0 ? availableStock : 1); // Reset to max possible or 1
+             updateModalDisplay();
+             return;
+        }
         // Find the item in the order and update its quantity
         const itemIndex = currentOrder.findIndex(i => i.product.item_id == editingItemId);
         if (itemIndex > -1) {
             console.log(`Confirming edit for ${selectedProduct.item_name}: Old Qty=${currentOrder[itemIndex].quantity}, New Qty=${quantity}`);
             currentOrder[itemIndex].quantity = quantity;
-            renderOrder(); // Update the order list
+            renderOrder();
         } else {
-             console.error(`Tried to confirm edit for item ID ${editingItemId}, but it wasn't found in the order.`);
+             console.error(`Tried to confirm edit for item ID ${editingItemId}, but it wasn't found.`);
         }
-        modalConfirmBtn.removeAttribute('data-editing-item-id'); // Clear editing flag
+        modalConfirmBtn.removeAttribute('data-editing-item-id');
     } else {
-        // Add the item to the order (addToOrder handles existing items internally)
+        // If adding new or adding more to an existing item (not via edit button)
+        const existingItem = currentOrder.find(i => i.product.item_id === selectedProduct.item_id);
+        const currentOrderQty = existingItem ? existingItem.quantity : 0;
+
+        if ((currentOrderQty + quantity) > availableStock) {
+            alert(`Insufficient stock for ${selectedProduct.item_name}. Only ${availableStock - currentOrderQty} more can be added (Total Available: ${availableStock}).`);
+            // Adjust quantity to max possible if trying to add too many
+            const maxAddable = availableStock - currentOrderQty;
+            modalInput = String(maxAddable > 0 ? maxAddable : 1); // Suggest max addable or 1
+            updateModalDisplay();
+             return;
+        }
+        // Add the item to the order (addToOrder handles merging quantities)
         console.log(`Confirming add for ${selectedProduct.item_name}: Qty=${quantity}`);
         addToOrder(selectedProduct, quantity);
     }
 
-    closeProductModal(); // Close modal on successful confirm
+    closeProductModal();
 }
+
 
 // ---------------------
 // Cash Modal Logic
 // ---------------------
+// openCashModal, closeCashModal, cashModalAppend, cashModalBackspace, updateCashModalDisplay, confirmCashModal, updateChangeDisplay
+// (Keep these functions as they are in your provided JS - they seem correct)
 function openCashModal() {
     const totals = calculateTotal();
     if (totals.finalTotal <= 0 && currentOrder.length === 0) {
-        alert("Add items to the order first before entering cash.");
+        alert("Add items to the order first.");
         return;
     }
-    // Pre-fill with current input value if it exists, otherwise start empty
     cashModalInput = cashReceivedInput.value || "";
     updateCashModalDisplay();
     cashModal.style.display = "flex";
@@ -800,59 +794,42 @@ function closeCashModal() {
 }
 
 function cashModalAppend(value) {
-    // Allow digits and at most one decimal point
     if (!/^[\d.]$/.test(value)) return;
+    if (value === '.' && cashModalInput.includes('.')) return;
+    if (cashModalInput.length >= 10) return;
 
-    if (value === '.' && cashModalInput.includes('.')) return; // Only one decimal point
-    if (cashModalInput.length >= 10) return; // Limit input length
-
-    // Handle leading zero correctly
     if (cashModalInput === "0" && value !== '.') {
-        cashModalInput = value; // Replace leading zero if not entering decimal
+        cashModalInput = value;
     } else if (cashModalInput === "" && value === '.') {
-        cashModalInput = "0."; // Start with 0. if decimal is first char
+        cashModalInput = "0.";
     } else {
-        // Prevent multiple leading zeros unless it's '0.'
         if (cashModalInput === "0" && value === "0") return;
         cashModalInput += value;
     }
 
-    // Limit decimal places (e.g., to 2) - optional
     const parts = cashModalInput.split('.');
     if (parts.length > 1 && parts[1].length > 2) {
-        cashModalInput = cashModalInput.slice(0, -1); // Remove last entered digit if > 2 decimal places
+        cashModalInput = cashModalInput.slice(0, -1);
         return;
     }
-
-
     updateCashModalDisplay();
 }
 
 
 function cashModalBackspace() {
     cashModalInput = cashModalInput.slice(0, -1);
-    // Optional: if input becomes empty, reset display?
-    // if (cashModalInput === "") cashModalInput = "0";
     updateCashModalDisplay();
 }
 
-function cashModalClear() {
-    cashModalInput = ""; // Clear the internal state
-    updateCashModalDisplay(); // Update the display (will show 0.00)
-}
-
-
 function updateCashModalDisplay() {
-    // Display the raw input or '0.00' if empty
     cashDisplay.textContent = cashModalInput || "0.00";
 }
 
 function confirmCashModal() {
-    // Use parseFloat to handle potential decimals
     const enteredValue = parseFloat(cashModalInput) || 0;
-    cashReceivedInput.value = enteredValue.toFixed(2); // Set formatted value in the main input field
+    cashReceivedInput.value = enteredValue.toFixed(2);
     closeCashModal();
-    updateChangeDisplay(); // Trigger change calculation immediately
+    updateChangeDisplay();
 }
 
 function updateChangeDisplay() {
@@ -860,17 +837,9 @@ function updateChangeDisplay() {
     const totals = calculateTotal();
     const finalTotal = totals.finalTotal;
 
-    // Only calculate change if there's a total amount
-    if (finalTotal <= 0) {
-        changeDisplay.innerText = ""; // No total, no change needed
-        changeDisplay.style.color = 'inherit'; // Reset color
-        return;
-    }
-
-    // Only calculate if cash has been entered
-    if (cash <= 0) {
-        changeDisplay.innerText = ""; // No cash entered, clear change
-        changeDisplay.style.color = 'inherit'; // Reset color
+    if (finalTotal <= 0 || cash <= 0) {
+        changeDisplay.innerText = "";
+        changeDisplay.style.color = 'inherit';
         return;
     }
 
@@ -878,25 +847,26 @@ function updateChangeDisplay() {
 
     if (change >= 0) {
         changeDisplay.innerText = `Change Due: Rs ${change.toFixed(2)}`;
-        changeDisplay.style.color = '#27ae60'; // Green for positive change
+        changeDisplay.style.color = '#27ae60'; // Green
     } else {
-        // Amount still due
         changeDisplay.innerText = `Amount Remaining: Rs ${Math.abs(change).toFixed(2)}`;
-        changeDisplay.style.color = '#e74c3c'; // Red for amount due
+        changeDisplay.style.color = '#e74c3c'; // Red
     }
 }
 
 // ---------------------
 // Customer Modal Logic
 // ---------------------
+// openCustomerModal, closeCustomerModal, customerModalAppend, customerModalBackspace, customerModalClear, updateCustomerModalDisplay, searchCustomer, selectCustomer, addCustomer, escapeSingleQuotes
+// (Keep these functions as they are in your provided JS - they seem correct)
 function openCustomerModal() {
     console.log("Opening customer modal");
-    customerModalInput = ""; // Reset phone input buffer
-    updateCustomerModalDisplay(); // Update the display inside modal
-    customerResultsArea.innerHTML = ""; // Clear previous search results
-    addCustomerSection.style.display = "none"; // Hide add form initially
-    customerMessageArea.textContent = ""; // Clear any previous messages
-    newCustomerNameInput.value = ""; // Clear add form fields
+    customerModalInput = "";
+    updateCustomerModalDisplay();
+    customerResultsArea.innerHTML = "";
+    addCustomerSection.style.display = "none";
+    customerMessageArea.textContent = "";
+    newCustomerNameInput.value = "";
     newCustomerEmailInput.value = "";
     customerModal.style.display = "flex";
 }
@@ -907,9 +877,8 @@ function closeCustomerModal() {
 }
 
 function customerModalAppend(value) {
-     if (!/^\d$/.test(value)) return; // Only allow digits
-
-    if (customerModalInput.length < 15) { // Limit phone number length (adjust as needed)
+     if (!/^\d$/.test(value)) return;
+    if (customerModalInput.length < 15) {
         customerModalInput += value;
         updateCustomerModalDisplay();
     }
@@ -923,19 +892,18 @@ function customerModalBackspace() {
 function customerModalClear() {
     customerModalInput = "";
     updateCustomerModalDisplay();
-    customerResultsArea.innerHTML = ""; // Also clear results when clearing input
+    customerResultsArea.innerHTML = "";
     addCustomerSection.style.display = "none";
     customerMessageArea.textContent = "";
 }
 
 function updateCustomerModalDisplay() {
-    // Display the entered number or a placeholder
     customerPhoneDisplay.textContent = customerModalInput || "Enter Phone Number";
 }
 
 async function searchCustomer() {
     const phoneNumber = customerModalInput.trim();
-    if (!phoneNumber || phoneNumber.length < 5) { // Basic validation (adjust length if needed)
+    if (!phoneNumber || phoneNumber.length < 5) {
         customerMessageArea.textContent = "Please enter a valid phone number (min 5 digits).";
         customerMessageArea.style.color = "red";
         return;
@@ -944,17 +912,15 @@ async function searchCustomer() {
     console.log(`Searching for customer with phone: ${phoneNumber}`);
     customerMessageArea.textContent = "Searching...";
     customerMessageArea.style.color = "orange";
-    customerResultsArea.innerHTML = '<p>Loading...</p>'; // Provide feedback
-    addCustomerSection.style.display = "none"; // Hide add form during search
+    customerResultsArea.innerHTML = '<p>Loading...</p>';
+    addCustomerSection.style.display = "none";
 
     try {
-        // Encode the phone number for the URL query string
-        const customers = await fetchData(`${BASE_URL}/customers/?phone_number=${encodeURIComponent(phoneNumber)}`);
+        const customers = await fetchData(`${BASE_URL}/customers/?phone_number=${encodeURIComponent(phoneNumber)}`, { loadingMsg: "Searching customer..."});
 
         if (customers && customers.length > 0) {
-            // Customer(s) found
             console.log("Customer(s) found:", customers);
-            const cust = customers[0]; // Use the first match for simplicity
+            const cust = customers[0];
             customerResultsArea.innerHTML = `
                 <div class="result-item">
                     <span>${cust.full_name || 'N/A'} (${cust.phone_number || 'N/A'})</span>
@@ -966,54 +932,48 @@ async function searchCustomer() {
             customerMessageArea.textContent = "Customer found.";
             customerMessageArea.style.color = "green";
         } else {
-            // Customer not found
             console.log("Customer not found.");
             customerResultsArea.innerHTML = `<p>Customer with phone '${phoneNumber}' not found.</p>`;
             customerMessageArea.textContent = "Customer not found. You can add them below.";
             customerMessageArea.style.color = "blue";
-            addCustomerSection.style.display = "block"; // Show the add form
-            newCustomerNameInput.focus(); // Focus on the name input
+            addCustomerSection.style.display = "block";
+            newCustomerNameInput.focus();
         }
     } catch (error) {
         console.error("Error searching customer:", error);
         customerMessageArea.textContent = `Error searching: ${error.message}`;
         customerMessageArea.style.color = "red";
-        customerResultsArea.innerHTML = "<p>Could not perform search. Check connection or API status.</p>";
+        customerResultsArea.innerHTML = "<p>Search failed. Check connection.</p>";
     }
 }
 
 function selectCustomer(customerId, customerName, customerPhone) {
     console.log(`Selected Customer: ID=${customerId}, Name=${customerName}, Phone=${customerPhone}`);
     selectedCustomerId = customerId;
-    selectedCustomerIdInput.value = customerId; // Update hidden input
-    customerDisplayInput.value = `${customerName || 'Customer'} (${customerPhone || 'N/A'})`; // Update display input on main page
+    selectedCustomerIdInput.value = customerId;
+    customerDisplayInput.value = `${customerName || 'Customer'} (${customerPhone || 'N/A'})`;
     closeCustomerModal();
 }
 
 async function addCustomer() {
     const name = newCustomerNameInput.value.trim();
-    const phone = customerModalInput.trim(); // Phone comes from the number pad entry
+    const phone = customerModalInput.trim();
     const email = newCustomerEmailInput.value.trim();
 
     if (!name || !phone) {
-        customerMessageArea.textContent = "Full Name and Phone Number are required to add.";
+        customerMessageArea.textContent = "Full Name and Phone Number are required.";
         customerMessageArea.style.color = "red";
         return;
     }
-    // Optional: More specific phone validation if needed
 
     const customerData = {
-        full_name: name,
-        phone_number: phone,
-        email: email || null, // Send null if email is empty
-        // Default other fields as per your schema definition if needed
+        full_name: name, phone_number: phone, email: email || null,
         street: null, city: null, state: null, zip_code: null, loyalty_points: 0
     };
 
     console.log("Attempting to add customer:", customerData);
     customerMessageArea.textContent = "Adding customer...";
     customerMessageArea.style.color = "orange";
-    // Disable add button while processing?
     const addButton = addCustomerSection.querySelector('.add-btn');
     if (addButton) addButton.disabled = true;
 
@@ -1022,356 +982,144 @@ async function addCustomer() {
         const newCustomer = await fetchData(`${BASE_URL}/customers/`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(customerData)
+            body: JSON.stringify(customerData),
+            loadingMsg: "Adding customer..."
         });
 
         console.log("Customer added successfully:", newCustomer);
         customerMessageArea.textContent = "Customer added successfully!";
         customerMessageArea.style.color = "green";
-        addCustomerSection.style.display = "none"; // Hide form after success
-
-        // Automatically select the newly added customer
+        addCustomerSection.style.display = "none";
         selectCustomer(newCustomer.customer_id, newCustomer.full_name, newCustomer.phone_number);
-
-        // Optional: close modal automatically after a short delay
-        // setTimeout(closeCustomerModal, 1500);
+         // setTimeout(closeCustomerModal, 1500); // Optional auto-close
 
     } catch (error) {
         console.error("Error adding customer:", error);
         customerMessageArea.textContent = `Error adding customer: ${error.message || 'Unknown error'}`;
         customerMessageArea.style.color = "red";
-        // Re-enable add button on failure
-        if (addButton) addButton.disabled = false;
+    } finally {
+         if (addButton) addButton.disabled = false;
     }
 }
 
-// Helper to escape single quotes in names/phones passed to onclick handlers
 function escapeSingleQuotes(str) {
     if (typeof str !== 'string') return "";
-    return str.replace(/'/g, "\\'"); // Basic escaping for HTML attribute context
+    return str.replace(/'/g, "\\'");
 }
 
-
-// assets/js/checkout.js
-
-// ... (keep all existing variables, constants, and functions before handleCheckout) ...
 
 // ---------------------
 // Checkout Process Logic
 // ---------------------
+// assets/js/checkout.js
+
+// ... (keep other functions like initialization, rendering, modals etc.) ...
+
 async function handleCheckout() {
     console.log("--- Starting Checkout Process ---");
+    displayGlobalError(''); // Clear previous errors
+
+    // --- Basic Frontend Validations (Keep these) ---
     if (currentOrder.length === 0) {
         alert("Cannot checkout with an empty order.");
         console.warn("Checkout aborted: Empty order.");
         return;
     }
-
-    // --- Validation ---
     const totals = calculateTotal();
     const finalTotal = totals.finalTotal;
     const cashReceived = parseFloat(cashReceivedInput.value) || 0;
     const selectedPaymentMethodId = paymentMethodSelect.value;
     const selectedPaymentOption = paymentMethodSelect.options[paymentMethodSelect.selectedIndex];
-    const selectedPaymentMethodName = selectedPaymentOption ? selectedPaymentOption.dataset.name : ''; // Get name from data attribute
+    const selectedPaymentMethodName = selectedPaymentOption?.dataset.name || '';
 
-    // 1. Payment Method Selected?
     if (!selectedPaymentMethodId) {
         alert("Please select a payment method.");
         paymentMethodSelect.focus();
         console.warn("Checkout aborted: No payment method selected.");
         return;
     }
-    console.log(`Payment Method Selected: ID=${selectedPaymentMethodId}, Name=${selectedPaymentMethodName}`);
-
-    // 2. Sufficient Cash for Cash Payment?
-    if (selectedPaymentMethodName === 'cash') {
-        console.log(`Cash Payment: Total=Rs ${finalTotal.toFixed(2)}, Received=Rs ${cashReceived.toFixed(2)}`);
-        if (cashReceived < finalTotal) {
-            alert(`Insufficient cash received (Rs ${cashReceived.toFixed(2)}) for the total amount (Rs ${finalTotal.toFixed(2)}).`);
-            // openCashModal(); // Optionally re-open cash modal
-            console.warn("Checkout aborted: Insufficient cash.");
-            return;
-        }
-    } else {
-        console.log(`Non-Cash Payment: Total=Rs ${finalTotal.toFixed(2)}`);
+    if (selectedPaymentMethodName === 'cash' && cashReceived < finalTotal) {
+        alert(`Insufficient cash received (Rs ${cashReceived.toFixed(2)}) for the total amount (Rs ${finalTotal.toFixed(2)}).`);
+        console.warn("Checkout aborted: Insufficient cash.");
+        return;
     }
+    // --- End Basic Frontend Validations ---
 
-    // --- Prepare Data ---
-    const staffId = parseInt(localStorage.getItem('staff_id')) || 1; // Example: Get from localStorage, default 1
-    const storeId = 1; // Example: Get from context if multi-store, default 1
-    console.log(`Context: StaffID=${staffId}, StoreID=${storeId}, CustomerID=${selectedCustomerId || 'None'}`);
 
-    // Adjust Sale Data - Backend should calculate total and status
-    const saleData = {
+    // --- Prepare Data (Keep this) ---
+    const staffId = parseInt(localStorage.getItem('staff_id')) || 1;
+    const storeId = 1; // Example: Hardcoded store ID
+    const saleDataForBackend = { /* ... as before ... */
         staff_id: staffId,
         store_id: storeId,
         customer_id: selectedCustomerId || null,
-        total_amount: 0, // Let backend calculate based on items/tax/discount
-        payment_status: "pending", // Backend should update based on payment
-        receipt_number: null,
-        refund_amount: 0.0,
-        refund_status: "none"
-        // Add discount_id and tax_id if needed by backend at Sale level
-        // discount_id: parseInt(discountSelect.options[discountSelect.selectedIndex]?.dataset.id) || null,
-        // tax_id: parseInt(taxSelect.options[taxSelect.selectedIndex]?.dataset.id) || null,
     };
-
-    const saleItemsData = currentOrder.map(item => {
-         const itemPrice = parseFloat(item.product.price) || 0;
-         const quantity = item.quantity;
-         // Simplification: Backend should calculate discount/tax per item based on rules
-         // For now, sending unit price and quantity.
-         return {
-            item_id: item.product.item_id,
-            quantity: quantity,
-            unit_price: itemPrice,
-            discount: 0.0, // Placeholder - Backend calculates
-            tax: 0.0       // Placeholder - Backend calculates
-         };
-    });
-
-    // Amount for the payment record:
-    // For cash, it's the total amount (change is handled separately). For others, it's the final total.
-    // Backend should ideally calculate this based on sale items.
-    // We send the expected final total for the payment record.
-    const paymentAmount = finalTotal;
-
-    const paymentDataPayload = {
-        amount: paymentAmount,
+    const saleItemsForBackend = currentOrder.map(item => ({ /* ... as before ... */
+        item_id: item.product.item_id,
+        quantity: item.quantity,
+        unit_price: parseFloat(item.product.price) || 0,
+        discount: 0.0, // Placeholder
+        tax: 0.0       // Placeholder
+    }));
+    const paymentDataForBackend = [{ /* ... as before ... */
+        amount: finalTotal,
         payment_method_id: parseInt(selectedPaymentMethodId),
-        transaction_reference: null // Add later if needed
+        transaction_reference: null
+    }];
+    const processSalePayload = {
+        sale_data: saleDataForBackend,
+        sale_items: saleItemsForBackend,
+        payments_data: paymentDataForBackend
     };
+    console.log("Checkout Payload Prepared for /process_sale:", JSON.stringify(processSalePayload, null, 2));
+    // --- End Prepare Data ---
 
-    console.log("Checkout Data Prepared:");
-    console.log("Sale Data:", JSON.stringify(saleData, null, 2));
-    console.log("Sale Items Data:", JSON.stringify(saleItemsData, null, 2));
-    console.log("Payment Data Payload:", JSON.stringify(paymentDataPayload, null, 2));
 
-    showLoadingIndicators(true, "Processing Checkout...");
-    let createdSaleId = null; // Initialize here
+    // --- Process Sale ---
+    showLoadingIndicators(true, "Processing Checkout..."); // Show loading overlay
 
-    // --- API Calls in Sequence ---
     try {
-        // << --- OPTIONAL REFACTOR: Consider using /process_sale/ endpoint --- >>
-        // If your backend's /process_sale endpoint handles Sale, Items, Payment, and Stock in one go:
-        /*
-        const processSalePayload = {
-            sale_data: saleData,
-            sale_items: saleItemsData,
-            payments_data: [paymentDataPayload] // Send payment as a list
-        };
-        console.log("Attempting transactional sale via /process_sale/");
+        console.log("Attempting checkout via /process_sale/");
         const processedSale = await fetchData(`${BASE_URL}/process_sale/`, {
              method: "POST",
              headers: { "Content-Type": "application/json" },
-             body: JSON.stringify(processSalePayload)
+             body: JSON.stringify(processSalePayload),
+             loadingMsg: "Processing Checkout..." // Custom loading message for fetchData
         });
-        createdSaleId = processedSale.sale_id;
-        console.log(`Transactional Sale Processed: ID = ${createdSaleId}`);
-        // If using process_sale, skip the individual steps below
-        */
 
-        // << --- USING SEQUENTIAL CALLS (as per original code) --- >>
-        // Step 1: Create the Sale Record
-        console.log("Step 1: Creating Sale record...");
-        // Send data without calculated total/status - let backend do it
-        const salePayloadStep1 = {
-            staff_id: staffId,
-            store_id: storeId,
-            customer_id: selectedCustomerId || null,
-            // Add discount/tax IDs if applicable at sale level
-        };
-        const newSale = await fetchData(`${BASE_URL}/sales/`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(salePayloadStep1) // Send minimal data first
-        });
-        createdSaleId = newSale.sale_id;
-        console.log(`Sale Record Created: ID = ${createdSaleId}`);
-
-        // Step 2: Create Sale Items (Loop) & Calculate Backend Total
-        console.log(`Step 2: Creating ${saleItemsData.length} Sale Item record(s)...`);
-        let itemErrors = [];
-        let backendCalculatedTotal = 0; // Recalculate based on added items if needed
-        for (const itemData of saleItemsData) {
-            itemData.sale_id = createdSaleId;
-            try {
-                const addedItem = await fetchData(`${BASE_URL}/sale_items/`, { // Assuming endpoint adds and returns item details incl. subtotal
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(itemData)
-                });
-                console.log(` -> Sale Item added successfully: Item ID ${itemData.item_id}`);
-                // Optional: Sum subtotals if backend returns them, useful for verifying payment amount
-                // backendCalculatedTotal += parseFloat(addedItem.subtotal || 0);
-            } catch (itemError) {
-                console.error(`Failed to add item ID ${itemData.item_id} for Sale ID ${createdSaleId}:`, itemError);
-                itemErrors.push(`Item ID ${itemData.item_id}: ${itemError.message}`);
-                // Decide behavior: Continue processing other items or stop? Let's continue.
-            }
+        // --- !! IMPORTANT CHECK !! ---
+        // Although fetchData now throws, this check adds an extra layer of safety
+        // in case fetchData's error handling changes or misses something.
+        // Primarily, it ensures we don't proceed if fetchData somehow returned
+        // undefined or an object without sale_id after a seemingly "successful" fetch.
+        if (!processedSale || typeof processedSale.sale_id === 'undefined') {
+            console.error("Checkout process failed: Invalid response received from /process_sale/ endpoint even after fetch.", processedSale);
+            // Throw an error to be caught by the catch block below
+            throw new Error("Received invalid or incomplete response from server after processing sale.");
         }
-         // Optional: Update Sale with calculated total/discount/tax if backend requires it after items are added
-         // This step depends heavily on backend design. If /payments needs the final total,
-         // you might need a PUT /sales/{createdSaleId} here. Let's assume payment works without it for now.
+        // --- End Check ---
 
-        // Step 3: Create the Payment Record (Crucial)
-        console.log("Step 3: Creating Payment record...");
-        paymentDataPayload.sale_id = createdSaleId;
-        // Use the frontend calculated final total for the payment amount for now
-        paymentDataPayload.amount = finalTotal;
+        // If the check passes, proceed with success logic
+        lastOrderId = processedSale.sale_id; // Now safe to access
+        console.log(`Checkout successful! Sale ID: ${lastOrderId}, Status: ${processedSale.payment_status}`);
 
-        try {
-            // Use SplitPayment endpoint if that's the standard now
-            await fetchData(`${BASE_URL}/split_payments/`, { // CHANGE TO /split_payments/
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(paymentDataPayload)
-            });
-            console.log("Payment Record Created successfully via SplitPayments.");
-            // Optionally update Sale status to 'paid' via PUT /sales/{id} if backend doesn't do it automatically
-            /*
-            try {
-                await fetchData(`${BASE_URL}/sales/${createdSaleId}`, {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ payment_status: 'paid', total_amount: finalTotal }) // Update status and final total
-                });
-                console.log(`Sale ${createdSaleId} status updated to paid.`);
-            } catch (updateError) {
-                console.warn(`Failed to update sale status for ${createdSaleId}: ${updateError.message}`);
-            }
-            */
-
-        } catch (paymentError) {
-            console.error(`CRITICAL ERROR: Failed to create payment record for Sale ID ${createdSaleId}:`, paymentError);
-            alert(`CRITICAL WARNING: Order ${createdSaleId} items recorded, but FAILED TO RECORD PAYMENT (${paymentError.message}). Please manually verify payment and contact support.`);
-            // Set lastOrderId for investigation, but warn user.
-            lastOrderId = createdSaleId;
-            showLoadingIndicators(false);
-            // DO NOT clear the order automatically here.
-            return; // Stop further processing
-        }
-        // << --- END OF SEQUENTIAL CALLS --- >>
-
-        // --- Handle Final Outcome ---
-        lastOrderId = createdSaleId; // Store the ID for receipt printing
-        console.log(`Checkout successfully processed Sale ID: ${lastOrderId}`);
-
-        // Handle item errors if any occurred during sequential add
-        if (itemErrors.length > 0) {
-             alert(`Order ${lastOrderId} processed with payment recorded, but some items failed to add:\n\n- ${itemErrors.join("\n- ")}\n\nPlease review the sale details manually.`);
-        } else {
-             // Full success alert (optional, prompt replaces it)
-             // alert(`Order ${lastOrderId} processed successfully!`);
-             console.log("All steps successful.");
-        }
-
-        // --- *** NEW: Prompt for Printing *** ---
-        const printConfirmed = confirm(`Order ${lastOrderId} successful! Print receipt?`);
+        const printConfirmed = confirm(`Order ${lastOrderId} processed successfully! Print receipt?`);
         if (printConfirmed) {
-            console.log("User confirmed print.");
-            handlePrintReceipt(); // Attempt to print
-        } else {
-            console.log("User declined print.");
+            handlePrintReceipt();
         }
-
-        // --- *** Clear Order AFTER Prompt *** ---
         handleClearOrder(); // Clear the form for the next sale
 
-    } catch (error) {
-        console.error("Checkout process failed:", error);
-        // Error likely during Sale creation or a critical Fetch error
-        alert(`Error processing order: ${error.message || 'Unknown error occurred during checkout.'}`);
+    } catch (error) { // Catches errors thrown by fetchData or the check above
+        console.error("Checkout process failed in handleCheckout catch block:", error);
+        // The alert will display the specific error message (e.g., validation details, 500 error, network error)
+        // The message "Error processing order: ..." comes from the Error object's message property.
+        alert(`Error processing order: ${error.message || 'Unknown error occurred.'}. Please check details or retry.`);
         lastOrderId = null; // Ensure print isn't possible for failed order
-        // Do not clear the order if checkout failed, allow user to retry or adjust.
+        // Do NOT clear the order automatically on failure.
     } finally {
-        showLoadingIndicators(false); // Hide processing indicator
+        showLoadingIndicators(false); // Hide loading overlay regardless of outcome
         console.log("--- Checkout Process Ended ---");
     }
 }
 
-
-// Modify handlePrintReceipt to add pop-up blocker warning
-function handlePrintReceipt() {
-    if (!lastOrderId) {
-        console.warn("Print Receipt called but lastOrderId is null.");
-        // This alert might be redundant if called only after confirmation, but safe to keep
-        alert("No successfully completed order available to print receipt.");
-        return;
-    }
-    console.log(`Attempting to print receipt for Order ID: ${lastOrderId}`);
-    const url = `${BASE_URL}/sales/${lastOrderId}/receipt/pdf`;
-
-    const pdfWindow = window.open(url, "_blank");
-
-    // Check if window.open was potentially blocked
-    if (!pdfWindow || pdfWindow.closed || typeof pdfWindow.closed === 'undefined') {
-        console.warn("window.open might have been blocked by a pop-up blocker.");
-        alert("Could not open receipt window. Please check if your browser is blocking pop-ups for this site.");
-    } else {
-        console.log("Receipt window opened (or attempted).");
-        // Optional: focus the new window if possible
-        // pdfWindow.focus();
-    }
-
-    // We no longer manage the button visibility here as we use the prompt flow.
-}
-
-// Modify handleClearOrder to reset lastOrderId
-function handleClearOrder() {
-    if (currentOrder.length === 0 && !cashReceivedInput.value && !customerDisplayInput.value && !selectedCustomerId && lastOrderId === null) {
-        console.log("Clear Order: Nothing significant to clear.");
-        return; // Nothing significant to clear
-    }
-
-    // Confirmation is good practice if clearing non-empty state
-    if (currentOrder.length > 0 || cashReceivedInput.value || selectedCustomerId) {
-        if (!confirm("Are you sure you want to clear the current order state?")) {
-            return;
-        }
-    }
-
-    console.log("Clearing order state...");
-    currentOrder = [];
-    selectedCustomerId = null;
-    lastOrderId = null; // *** ADD THIS: Reset the ID for printing ***
-
-    // Reset UI elements
-    discountSelect.value = "0";
-    taxSelect.value = "0";
-    paymentMethodSelect.value = "";
-    cashReceivedInput.value = "";
-    cashModalInput = "";
-    changeDisplay.innerText = "";
-    changeDisplay.style.color = 'inherit'; // Reset color
-    customerDisplayInput.value = "";
-    customerModalInput = "";
-    selectedCustomerIdInput.value = "";
-    customerMessageArea.textContent = "";
-    customerResultsArea.innerHTML = "";
-    addCustomerSection.style.display = "none";
-    newCustomerNameInput.value = "";
-    newCustomerEmailInput.value = "";
-
-    // Reset buttons to initial state (Checkout/Clear enabled, Print disabled/hidden)
-    checkoutBtn.disabled = false;
-    clearOrderBtn.disabled = false; // Or disable if order is truly empty now
-    printReceiptBtn.style.display = "none"; // Hide print button again
-    printReceiptBtn.disabled = true;
-
-    renderOrder(); // Update the order display (shows "No items")
-    updateCashModalDisplay();
-    updateCustomerModalDisplay();
-    console.log("Order State Cleared.");
-
-    productSearchInput.focus(); // Focus search for next order
-}
-
-
-// ... (keep all other functions like fetchData, debounce, loadCategories, loadProducts, render functions, modal functions, etc.) ...
-
-// Make sure initialization calls the modified functions correctly
-document.addEventListener('DOMContentLoaded', initializeCheckout);
-
-// ... (rest of the file remains the same) ...
+// ... (rest of checkout.js remains the same) ...
